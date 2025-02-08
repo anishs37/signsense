@@ -38,6 +38,8 @@ jobs:
           wget http://archive.ubuntu.com/ubuntu/pool/universe/i/ilmbase/libilmbase24_2.3.0-6build1_amd64.deb
           wget http://archive.ubuntu.com/ubuntu/pool/universe/o/openexr/libopenexr24_2.3.0-6ubuntu0.5_amd64.deb
           sudo dpkg -i libilmbase24_2.3.0-6build1_amd64.deb libopenexr24_2.3.0-6ubuntu0.5_amd64.deb || sudo apt-get install -f -y
+          wget http://archive.ubuntu.com/ubuntu/pool/universe/libd/libdc1394-22/libdc1394-22_2.2.5-2.1_amd64.deb
+          sudo dpkg -i libdc1394-22/libdc1394-22_2.2.5-2.1_amd64.deb || sudo apt-get install -f -y
       
       - name: Install Python Dependencies
         run: |
