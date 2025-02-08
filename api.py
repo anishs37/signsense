@@ -34,8 +34,7 @@ image = (
         "httpx",
         "pydantic",
         "python-multipart",
-        "numpy==1.23.5",
-        "msvc-runtime"
+        "numpy==1.23.5"
     ])
 )
 
