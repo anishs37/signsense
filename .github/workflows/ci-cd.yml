@@ -37,7 +37,8 @@ jobs:
                       opencv-python-headless \
                       httpx \
                       python-multipart \
-                      pydantic
+                      pydantic \
+                      mediapipe
       
       - name: Deploy to Modal
         run: |
