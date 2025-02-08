@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { HandMetal, Sparkles, Book, Brain, Loader2, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { HandMetal, Sparkles, Brain, Loader2, ChevronRight, CheckCircle2 } from 'lucide-react';
 
 export default function PreAssessment() {
   const router = useRouter();
@@ -56,15 +56,9 @@ export default function PreAssessment() {
       [name]: value
     }));
     
-    if (value.length >= 3) {
-      const newCompleted = [...isCompleted];
-      newCompleted[currentStep] = true;
-      setIsCompleted(newCompleted);
-    } else {
-      const newCompleted = [...isCompleted];
-      newCompleted[currentStep] = false;
-      setIsCompleted(newCompleted);
-    }
+    const newCompleted = [...isCompleted];
+    newCompleted[currentStep] = (value.length >= 3);
+    setIsCompleted(newCompleted);
   };
 
   const nextStep = () => {
@@ -77,7 +71,7 @@ export default function PreAssessment() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    
+
     try {
       const res = await fetch('/api/generatePlan', {
         method: 'POST',
@@ -90,14 +84,19 @@ export default function PreAssessment() {
       }
 
       const data = await res.json();
-      if (!data.plan) throw new Error('No plan data received');
-      
+
+      if (!data.learningPathway) {
+        throw new Error('No plan data received');
+      }
+
       setShowCelebration(true);
-      localStorage.setItem('learningPlan', JSON.stringify(data.plan));
-      
+
+      localStorage.setItem('learningPlan', JSON.stringify(data));
+
       setTimeout(() => {
         router.push('/plan');
       }, 2000);
+
     } catch (error) {
       setError(error.message || 'Something went wrong generating your plan.');
     } finally {
@@ -109,7 +108,6 @@ export default function PreAssessment() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-background relative overflow-hidden">
-      {/* Animated background */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 animate-gradient-x">
           <div className="absolute top-0 -left-1/2 w-[200%] h-[200%] bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5" />
@@ -119,9 +117,8 @@ export default function PreAssessment() {
         </div>
       </div>
 
-      {/* Progress bar */}
       <div className="fixed top-0 left-0 w-full h-2 bg-muted">
-        <motion.div 
+        <motion.div
           className="h-full bg-primary"
           initial={{ width: 0 }}
           animate={{ width: `${((currentStep + 1) / questions.length) * 100}%` }}
@@ -129,14 +126,14 @@ export default function PreAssessment() {
         />
       </div>
 
-      <motion.div 
+      <motion.div
         className="w-full max-w-xl relative z-10"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
         {error && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive"
@@ -164,8 +161,12 @@ export default function PreAssessment() {
                   <CurrentQuestion.icon className={`w-12 h-12 ${CurrentQuestion.color}`} />
                 </motion.div>
                 <div>
-                  <h2 className="text-xl font-semibold text-card-foreground">{CurrentQuestion.title}</h2>
-                  <p className="text-muted-foreground">{CurrentQuestion.question}</p>
+                  <h2 className="text-xl font-semibold text-card-foreground">
+                    {CurrentQuestion.title}
+                  </h2>
+                  <p className="text-muted-foreground">
+                    {CurrentQuestion.question}
+                  </p>
                 </div>
               </div>
 
@@ -211,7 +212,6 @@ export default function PreAssessment() {
           </AnimatePresence>
         </Card>
 
-        {/* Step indicators */}
         <div className="flex justify-center mt-6 space-x-2">
           {questions.map((_, index) => (
             <motion.div
@@ -224,14 +224,21 @@ export default function PreAssessment() {
                     : 'bg-muted'
               }`}
               initial={false}
-              animate={index === currentStep ? { scale: [1, 1.2, 1] } : {}}
-              transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}
+              animate={
+                index === currentStep
+                  ? { scale: [1, 1.2, 1] }
+                  : {}
+              }
+              transition={{
+                duration: 0.5,
+                repeat: Infinity,
+                repeatDelay: 1
+              }}
             />
           ))}
         </div>
       </motion.div>
 
-      {/* Celebration animation */}
       <AnimatePresence>
         {showCelebration && (
           <motion.div

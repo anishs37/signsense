@@ -1,98 +1,118 @@
 import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
-import JSON5 from 'json5';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    console.log('Received request body:', body);
+    console.log('[generatePlan] Received request body:', body);
 
+    // The pre-assessment page sends { experience, goals, learningStyle }
     const { experience, goals, learningStyle } = body;
 
+    // Validate required fields
     if (!experience || !goals || !learningStyle) {
+      console.error('[generatePlan] Missing user data to create plan.');
       return NextResponse.json(
-        { message: 'Missing assessment data' },
+        { message: 'Missing user data (experience, goals, learningStyle)' },
         { status: 400 }
       );
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      console.error('OpenAI API key is not configured');
-      return NextResponse.json(
-        { message: 'Server configuration error' },
-        { status: 500 }
-      );
-    }
+    // Build the system prompt for GPT
+    const systemPrompt = `
+      You are an expert ASL tutor. The user has given you:
+      - Experience: ${experience}
+      - Goals: ${goals}
+      - Learning Style: ${learningStyle}
 
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    const prompt = `
-      You are an ASL tutor. A user has the following background:
-      Experience: ${experience}
-      Goals: ${goals}
-      Learning Style: ${learningStyle}
-
-      Create a structured learning plan with 3-5 modules.
-      For each module, provide a title, description, and 2-3 sub-lessons.
-      
-      Important: Respond ONLY with the raw JSON array, no markdown formatting or code blocks.
-      Format:
-      [
-        {
-          "moduleTitle": "Module Name",
-          "description": "Module Description",
-          "subLessons": [
-            {"title": "Lesson 1", "description": "Lesson 1 Description"},
-            {"title": "Lesson 2", "description": "Lesson 2 Description"}
-          ]
-        }
-      ]
+      You must generate a structured ASL learning plan in JSON form.
+      Respond with JSON only. No extra text.
     `;
 
-    console.log('Sending request to OpenAI');
-    
+    // The user prompt can specify the structure for the "plan"
+    const userPrompt = `
+      Please create a JSON with a "learningPathway" array, each containing:
+      {
+        "moduleId": "1",
+        "name": "Introduction to ASL",
+        "description": "...",
+        "estimatedDuration": "...",
+        "subLessons": [
+           {
+             "lessonId": "101",
+             "lessonTitle": "Fingerspelling Basics",
+             "description": "..."
+           },
+           ...
+        ]
+      }
+
+      The plan should have 3-5 modules, each with subLessons. Make them relevant to:
+      - The user's experience: "${experience}"
+      - The user's goals: "${goals}"
+      - The user's learning style: "${learningStyle}"
+
+      Return only JSON. Example:
+      {
+        "learningPathway": [
+          {
+            "moduleId": "1",
+            "name": "Intro to ASL",
+            "description": "Some text",
+            "estimatedDuration": "1 week",
+            "subLessons": [
+              {
+                "lessonId": "101",
+                "lessonTitle": "Fingerspelling Basics",
+                "description": "Learn the alphabet"
+              }
+            ]
+          },
+          ...
+        ]
+      }
+    `;
+
+    console.log('[generatePlan] systemPrompt:', systemPrompt);
+    console.log('[generatePlan] userPrompt:', userPrompt);
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-3.5-turbo', // or 'gpt-4' if you have it
       messages: [
-        { 
-          role: 'system', 
-          content: 'You are a helpful ASL tutor. Always respond with clean, valid JSON only, no markdown or code blocks.' 
-        },
-        { role: 'user', content: prompt }
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: 500,
+      max_tokens: 1200,
     });
 
-    console.log('Received response from OpenAI');
+    const rawContent = completion.choices[0].message.content.trim();
+    console.log('[generatePlan] GPT raw content:', rawContent);
 
-    let responseText = completion.choices[0].message.content.trim();
-
-    // Optional: Function to remove trailing commas if needed
-    function removeTrailingCommas(jsonString) {
-      return jsonString.replace(/,\s*([}\]])/g, '$1');
-    }    
-    
-    // Clean the response text by removing any markdown code block markers and trailing commas
-    responseText = removeTrailingCommas(responseText);
-    console.log('Cleaned response:', responseText);
-
-    let plan;
+    // Attempt to parse the JSON
+    let parsedPlan;
     try {
-      plan = JSON.parse(responseText);
+      parsedPlan = JSON.parse(rawContent);
     } catch (err) {
-      console.error('Failed to parse JSON from OpenAI response:', err);
+      console.error('[generatePlan] Error parsing GPT content as JSON:', err);
       return NextResponse.json(
-        { message: 'Error parsing the plan from AI. Please try again.' },
+        {
+          message: 'Error parsing the plan from AI. Please try again.',
+          rawContent
+        },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ plan }, { status: 200 });
+    // Return the plan
+    return NextResponse.json(parsedPlan, { status: 200 });
+
   } catch (error) {
-    console.error('API route error:', error);
+    console.error('[generatePlan] Unexpected error:', error);
     return NextResponse.json(
       { message: 'Server error: ' + error.message },
       { status: 500 }
