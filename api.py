@@ -24,7 +24,7 @@ logger.info("Starting server initialization...")
 image = (modal.Image.debian_slim()
     .apt_install([
         "python3-opencv",
-        "libgl1-mesa-glx",
+        "libgl1",  # Changed from libgl1-mesa-glx to libgl1
         "libglib2.0-0"
     ])
     .pip_install([
