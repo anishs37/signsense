@@ -27,8 +27,9 @@ logger.info("Starting server initialization...")
 image = (modal.Image.debian_slim()
     .apt_install([
         "python3-opencv",
-        "libgl1",  # Changed from libgl1-mesa-glx to libgl1
-        "libglib2.0-0"
+        "libgl1",
+        "libglib2.0-0",
+        "ffmpeg"
     ])
     .pip_install([
         "fastapi[standard]",
@@ -37,10 +38,12 @@ image = (modal.Image.debian_slim()
         "httpx",
         "pydantic",
         "python-multipart",
-        "numpy",
-        "mediapipe"  # Added mediapipe to the dependencies
+        "numpy==1.23.5",
+        "mediapipe @ https://github.com/google/mediapipe/releases/download/v0.9.1/mediapipe-0.9.1-cp39-cp39-manylinux2014_x86_64.whl"
     ])
 )
+
+
 app = modal.App(name="signsync-api", image=image)
 web_app = FastAPI()
 

@@ -26,7 +26,8 @@ jobs:
           sudo apt-get install -y \
             python3-opencv \
             libgl1 \
-            libglib2.0-0
+            libglib2.0-0 \
+            ffmpeg
       
       - name: Install Python Dependencies
         run: |
@@ -38,7 +39,9 @@ jobs:
                       httpx \
                       python-multipart \
                       pydantic \
-                      mediapipe
+                      numpy==1.23.5
+          wget https://github.com/google/mediapipe/releases/download/v0.9.1/mediapipe-0.9.1-cp39-cp39-manylinux2014_x86_64.whl
+          pip install mediapipe-0.9.1-cp39-cp39-manylinux2014_x86_64.whl
       
       - name: Deploy to Modal
         run: |
