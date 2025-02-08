@@ -26,6 +26,11 @@ image = (
         "libgl1",
         "libglib2.0-0",
         "ffmpeg",
+        "libtiff5",
+        "libtiff-dev",
+        "libprotobuf-dev",
+        "protobuf-compiler",
+        "libopencv-dev"
     ])
     .pip_install([
         "fastapi[standard]",

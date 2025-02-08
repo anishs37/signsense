@@ -31,7 +31,12 @@ jobs:
             libglib2.0-0 \
             ffmpeg \
             build-essential \
-            python3-dev
+            python3-dev \
+            libtiff5 \
+            libtiff-dev \
+            libprotobuf-dev \
+            protobuf-compiler \
+            libopencv-dev
       
       - name: Install Python Dependencies
         run: |
@@ -45,7 +50,4 @@ jobs:
                       pydantic \
                       numpy==1.23.5
           wget https://github.com/cansik/mediapipe-extended/releases/download/v0.9.1/mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl
-          pip install mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl --no-deps
-      
-      - name: Deploy to Modal
-        run: modal deploy api.py
+          pip install mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl
