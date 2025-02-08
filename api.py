@@ -26,39 +26,6 @@ image = (
         "libgl1",
         "libglib2.0-0",
         "ffmpeg",
-        "libdc1394-22",
-        "libdc1394-22-dev",
-        "libavcodec-dev",
-        "libavformat-dev",
-        "libswscale-dev",
-        "libv4l-dev",
-        "libxvidcore-dev",
-        "libx264-dev",
-        "libjpeg-dev",
-        "libpng-dev",
-        "libtiff-dev",
-        "gfortran",
-        "openexr",
-        "libatlas-base-dev",
-        "libhdf5-dev",
-        "libhdf5-serial-dev",
-        "libgtk-3-dev",
-        "libboost-all-dev"
-    ])
-    .run_commands([
-        "wget https://archive.ubuntu.com/ubuntu/pool/main/t/tiff/libtiff5_4.3.0-6_amd64.deb",
-        "sudo dpkg -i libtiff5_4.3.0-6_amd64.deb || sudo apt-get install -f -y",
-        "wget https://github.com/cansik/mediapipe-extended/releases/download/v0.9.1/mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl",
-        "pip install mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl",
-        "wget http://archive.ubuntu.com/ubuntu/pool/universe/o/openexr/libopenexr-dev_3.1.5-5.1build3_amd64.deb",
-        "wget http://archive.ubuntu.com/ubuntu/pool/universe/i/imath/libimath-dev_3.1.11-2ubuntu3_amd64.deb",
-        "sudo dpkg -i libimath-dev_3.1.11-2ubuntu3_amd64.deb libopenexr-dev_3.1.5-5.1build3_amd64.deb || sudo apt-get install -f -y",
-        "wget http://archive.ubuntu.com/ubuntu/pool/universe/i/ilmbase/libilmbase24_2.3.0-6build1_amd64.deb",
-        "wget http://archive.ubuntu.com/ubuntu/pool/universe/o/openexr/libopenexr24_2.3.0-6ubuntu0.5_amd64.deb",
-        "sudo dpkg -i libilmbase24_2.3.0-6build1_amd64.deb libopenexr24_2.3.0-6ubuntu0.5_amd64.deb || sudo apt-get install -f -y",
-        "wget http://archive.ubuntu.com/ubuntu/pool/universe/libd/libdc1394-22/libdc1394-22_2.2.5-2.1_amd64.deb",
-        "sudo dpkg -i libdc1394-22_2.2.5-2.1_amd64.deb || sudo apt-get install -f -y",
-        "sudo ln -s /usr/lib/x86_64-linux-gnu/libdc1394.so /usr/lib/x86_64-linux-gnu/libdc1394.so.22 || true"
     ])
     .pip_install([
         "fastapi[standard]",
@@ -67,7 +34,8 @@ image = (
         "httpx",
         "pydantic",
         "python-multipart",
-        "numpy==1.23.5"  # Compatible NumPy version for MediaPipe 0.9.x
+        "numpy==1.23.5",
+        "msvc-runtime"
     ])
 )
 
