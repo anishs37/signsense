@@ -32,7 +32,7 @@ jobs:
             ffmpeg
           wget https://archive.ubuntu.com/ubuntu/pool/main/t/tiff/libtiff5_4.3.0-6_amd64.deb
           wget http://archive.ubuntu.com/ubuntu/pool/universe/o/openexr/libopenexr-dev_3.1.5-5.1build3_amd64.deb
-          wget http://archive.ubuntu.com/ubuntu/pool/universe/i/imath/libimath-dev_3.1.11-2ubuntu3_amd64.deb"
+          wget http://archive.ubuntu.com/ubuntu/pool/universe/i/imath/libimath-dev_3.1.11-2ubuntu3_amd64.deb
           sudo dpkg -i libtiff5_4.3.0-6_amd64.deb || sudo apt-get install -f -y
           sudo dpkg -i libimath-dev_3.1.11-2ubuntu3_amd64.deb libopenexr-dev_3.1.5-5.1build3_amd64.deb || sudo apt-get install -f -y
       
