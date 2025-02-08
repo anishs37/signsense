@@ -18,7 +18,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.9"
+          python-version: "3.8"
       
       - name: Install System Dependencies
         run: |
@@ -40,8 +40,8 @@ jobs:
                       python-multipart \
                       pydantic \
                       numpy==1.23.5
-          wget https://github.com/google/mediapipe/releases/download/v0.9.1/mediapipe-0.9.1-cp39-cp39-manylinux2014_x86_64.whl
-          pip install mediapipe-0.9.1-cp39-cp39-manylinux2014_x86_64.whl
+          wget https://github.com/cansik/mediapipe-extended/releases/download/v0.9.1/mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl
+          pip install mediapipe-0.9.1-cp38-cp38-linux_x86_64.wh
       
       - name: Deploy to Modal
         run: |

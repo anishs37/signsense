@@ -39,7 +39,7 @@ image = (modal.Image.debian_slim()
         "pydantic",
         "python-multipart",
         "numpy==1.23.5",
-        "mediapipe @ https://github.com/google/mediapipe/releases/download/v0.9.1/mediapipe-0.9.1-cp39-cp39-manylinux2014_x86_64.whl"
+        "mediapipe @ https://github.com/cansik/mediapipe-extended/releases/download/v0.9.1/mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl"
     ])
 )
 
