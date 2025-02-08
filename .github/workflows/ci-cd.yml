@@ -24,12 +24,15 @@ jobs:
       
       - name: Install System Dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y \
+          sudo apt-get update
+          sudo apt-get install -y \
             python3-opencv \
             libgl1 \
             libglib2.0-0 \
-            ffmpeg \
-            libtiff5
+            ffmpeg
+          # Manually install libtiff5 from Ubuntu 22.04 repository
+          wget https://archive.ubuntu.com/ubuntu/pool/main/t/tiff/libtiff5_4.3.0-6_amd64.deb
+          sudo dpkg -i libtiff5_4.3.0-6_amd64.deb || sudo apt-get install -f -y
       
       - name: Install Python Dependencies
         run: |

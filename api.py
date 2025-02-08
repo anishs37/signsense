@@ -25,11 +25,11 @@ image = (
         "python3-opencv",
         "libgl1",
         "libglib2.0-0",
-        "ffmpeg",
-        "libtiff5"  # Fix for missing libtiff.so.5 issue
+        "ffmpeg"
     ])
     .run_commands([
-        # Download and install the specific MediaPipe wheel for Python 3.8 on Linux x86_64
+        "wget https://archive.ubuntu.com/ubuntu/pool/main/t/tiff/libtiff5_4.3.0-6_amd64.deb",
+        "sudo dpkg -i libtiff5_4.3.0-6_amd64.deb || sudo apt-get install -f -y",
         "wget https://github.com/cansik/mediapipe-extended/releases/download/v0.9.1/mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl",
         "pip install mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl"
     ])
@@ -40,7 +40,7 @@ image = (
         "httpx",
         "pydantic",
         "python-multipart",
-        "numpy==1.23.5"  # Compatible NumPy version for MediaPipe 0.9.1
+        "numpy==1.23.5"  # Compatible NumPy version for MediaPipe 0.9.x
     ])
 )
 
