@@ -33,7 +33,10 @@ image = (
         "wget https://archive.ubuntu.com/ubuntu/pool/main/t/tiff/libtiff5_4.3.0-6_amd64.deb",
         "sudo dpkg -i libtiff5_4.3.0-6_amd64.deb || sudo apt-get install -f -y",
         "wget https://github.com/cansik/mediapipe-extended/releases/download/v0.9.1/mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl",
-        "pip install mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl"
+        "pip install mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl",
+        "wget http://archive.ubuntu.com/ubuntu/pool/universe/o/openexr/libopenexr-dev_3.1.5-5.1build3_amd64.deb",
+        "wget http://archive.ubuntu.com/ubuntu/pool/universe/i/imath/libimath-dev_3.1.11-2ubuntu3_amd64.deb",
+        "sudo dpkg -i libimath-dev_3.1.11-2ubuntu3_amd64.deb libopenexr-dev_3.1.5-5.1build3_amd64.deb || sudo apt-get install -f -y"
     ])
     .pip_install([
         "fastapi[standard]",
