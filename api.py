@@ -25,7 +25,9 @@ image = (
         "python3-opencv",
         "libgl1",
         "libglib2.0-0",
-        "ffmpeg"
+        "ffmpeg",
+        "libopenexr-dev",
+        "libopenexr24"
     ])
     .run_commands([
         "wget https://archive.ubuntu.com/ubuntu/pool/main/t/tiff/libtiff5_4.3.0-6_amd64.deb",

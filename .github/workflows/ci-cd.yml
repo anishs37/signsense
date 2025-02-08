@@ -30,7 +30,8 @@ jobs:
             libgl1 \
             libglib2.0-0 \
             ffmpeg
-          # Manually install libtiff5 from Ubuntu 22.04 repository
+            libopenexr-dev \
+            libopenexr24
           wget https://archive.ubuntu.com/ubuntu/pool/main/t/tiff/libtiff5_4.3.0-6_amd64.deb
           sudo dpkg -i libtiff5_4.3.0-6_amd64.deb || sudo apt-get install -f -y
       
