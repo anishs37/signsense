@@ -5,7 +5,6 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import json
-from typing import Dict, List, Annotated
 from pydantic import BaseModel, Json, ValidationError
 from pymongo import MongoClient
 import logging
