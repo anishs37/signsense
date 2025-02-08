@@ -1,4 +1,5 @@
 name: CI/CD
+
 on:
   push:
     branches:
@@ -11,6 +12,7 @@ jobs:
     env:
       MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
       MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -22,12 +24,12 @@ jobs:
       
       - name: Install System Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get update && sudo apt-get install -y \
             python3-opencv \
             libgl1 \
             libglib2.0-0 \
-            ffmpeg
+            ffmpeg \
+            libtiff5
       
       - name: Install Python Dependencies
         run: |
@@ -44,5 +46,4 @@ jobs:
           pip install mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl
       
       - name: Deploy to Modal
-        run: |
-          modal deploy api.py
+        run: modal deploy api.py

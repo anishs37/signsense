@@ -1,34 +1,37 @@
 import os
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Body, Form
-from fastapi.responses import JSONResponse, Response
-from fastapi.encoders import jsonable_encoder
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import cv2
 import json
-from pydantic import BaseModel, Json, ValidationError
+from pydantic import BaseModel, ValidationError
 from pymongo import MongoClient
 import logging
 import sys
 import httpx
 import datetime
-import random
-import base64
-import modal
-import mediapipe as mp
-import time
 import numpy as np
+import modal
 
+# Set up logging
 logger = logging.getLogger('signsync-api')
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 logger.info("Starting server initialization...")
 
-image = (modal.Image.debian_slim()
+# Define Modal image with dependencies
+image = (
+    modal.Image.debian_slim(python_version="3.8")
     .apt_install([
         "python3-opencv",
         "libgl1",
         "libglib2.0-0",
-        "ffmpeg"
+        "ffmpeg",
+        "libtiff5"  # Fix for missing libtiff.so.5 issue
+    ])
+    .run_commands([
+        # Download and install the specific MediaPipe wheel for Python 3.8 on Linux x86_64
+        "wget https://github.com/cansik/mediapipe-extended/releases/download/v0.9.1/mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl",
+        "pip install mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl"
     ])
     .pip_install([
         "fastapi[standard]",
@@ -37,15 +40,15 @@ image = (modal.Image.debian_slim()
         "httpx",
         "pydantic",
         "python-multipart",
-        "numpy==1.23.5",
-        "mediapipe @ https://github.com/cansik/mediapipe-extended/releases/download/v0.9.1/mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl"
+        "numpy==1.23.5"  # Compatible NumPy version for MediaPipe 0.9.1
     ])
 )
 
-
+# Initialize Modal app and FastAPI app
 app = modal.App(name="signsync-api", image=image)
 web_app = FastAPI()
 
+# Add CORS middleware for cross-origin requests
 web_app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "https://anishs37--signsync-api-fastapi-app.modal.run"],
@@ -54,7 +57,9 @@ web_app.add_middleware(
     allow_headers=["*"]
 )
 
-# Initialize MediaPipe Hands
+# Initialize MediaPipe Hands solution
+import mediapipe as mp
+
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(
     static_image_mode=True,
@@ -107,7 +112,8 @@ async def detect_hands(image: UploadFile):
                 hand_poses.append(hand_pose)
             
             return {"status": "success", "hand_poses": hand_poses}
-        else: return {"status": "no_hands_detected", "hand_poses": []}
+        else:
+            return {"status": "no_hands_detected", "hand_poses": []}
             
     except Exception as e:
         logger.error(f"Error processing image: {str(e)}", exc_info=True)
@@ -124,8 +130,6 @@ async def health_check():
         logger.info(f"Health check status: {status}")
         return status
     except Exception as e:
-
-        
         logger.error(f"Health check failed: {str(e)}", exc_info=True)
         return {"status": "unhealthy", "error": str(e)}
 
