@@ -41,7 +41,7 @@ jobs:
                       pydantic \
                       numpy==1.23.5
           wget https://github.com/cansik/mediapipe-extended/releases/download/v0.9.1/mediapipe_extended-0.9.1-cp38-cp38-linux_x86_64.whl
-          pip install mediapipe-0.9.1-cp38-cp38-linux_x86_64.wh
+          pip install mediapipe-0.9.1-cp38-cp38-linux_x86_64.whl
       
       - name: Deploy to Modal
         run: |
