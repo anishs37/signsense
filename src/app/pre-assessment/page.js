@@ -137,7 +137,6 @@ export default function PreAssessment() {
       if (!response.ok) {
         throw new Error('Failed to fetch user plans');
       }
-  
       const data = await response.json();
       if (data.plans && data.plans.length > 0) {
         setAvailablePlans(data.plans);
