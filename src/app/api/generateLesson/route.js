@@ -7,6 +7,46 @@ const perplexity = new OpenAI({
   baseURL: 'https://api.perplexity.ai'
 });
 
+function sanitizeForJSON(str) {
+  return str.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+}
+
+function cleanText(text) {
+  if (!text) return text;
+  let cleaned = text.replace(/\[\d+\]/g, '');
+  cleaned = cleaned.replace(/\[[A-Za-z]\d+\]/g, '');
+  cleaned = cleaned.replace(/\[[^\]]*\d[^\]]*\]/g, '');
+  cleaned = cleaned.replace(/\s+/g, ' ');  
+  return cleaned.trim();
+}
+
+function cleanLessonContent(content) {
+  if (!content) return content;
+
+  if (typeof content === 'string') {
+    return cleanText(content);
+  }
+
+  if (Array.isArray(content)) {
+    return content.map(item => {
+      if (typeof item === 'string') {
+        return cleanText(item);
+      }
+      return cleanLessonContent(item);
+    });
+  }
+
+  if (typeof content === 'object') {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(content)) {
+      cleaned[key] = cleanLessonContent(value);
+    }
+    return cleaned;
+  }
+
+  return content;
+}
+
 export async function POST(request) {
   let client;
 
@@ -98,6 +138,9 @@ export async function POST(request) {
       You are an expert ASL tutor, capable of generating detailed, 
       step-by-step lesson content based on provided context. 
       Always respond with valid JSON only, with no extra text.
+      Your explanations should be well-structured with clear sections and paragraph breaks.
+      Use markdown headers (# for main headers, ## for subheaders) to organize content.
+      Always add a line break (it must be $) after each header before starting the paragraph.
     `;
 
     const userPrompt = `
@@ -117,14 +160,25 @@ export async function POST(request) {
             "steps": [
               {
                 "title": "Step 1 Title",
-                "instruction": "Very in-depth textual explanation (like a textbook or blog)... (at least four paragraphs)",
+                "instruction": "Structure your content like this:
+                  # Main Topic Header
+                  Introduction paragraph giving an overview...
+
+                  ## Key Concept 1
+                  Detailed explanation of the first important point...
+
+                  ## Key Concept 2
+                  In-depth exploration of the second concept...
+
+                  ## Practice Method
+                  Specific instructions for practicing...",
                 "commonMistakes": ["..."],
                 "tips": ["..."],
                 "cameraActivity": false
               },
               {
                 "title": "Step 2 Title",
-                "instruction": "Proceed to more complex or interactive material...",
+                "instruction": "Use similar markdown structure for progressive steps...",
                 "commonMistakes": ["..."],
                 "tips": ["..."],
                 "cameraActivity": true
@@ -135,14 +189,20 @@ export async function POST(request) {
       }
 
       Each step should have:
-      - "title"
-      - "instruction"
-      - "commonMistakes"
-      - "tips"
-      - "cameraActivity"
+      - "title": Clear, concise title
+      - "instruction": Well-structured content using markdown headers (#, ##) and clear paragraph breaks
+      - "commonMistakes": List of specific mistakes to avoid
+      - "tips": Practical tips for success
+      - "cameraActivity": Boolean indicating if camera practice is needed
+
+      Instructions should be organized into clear sections with:
+      1. A main header (#) introducing the topic
+      2. Multiple subheaders (##) breaking down concepts
+      3. Clear paragraph breaks between sections
+      4. Progressive complexity from theory to practice
 
       Make sure the lesson escalates in depth: 
-        The first step is a thorough reading. 
+        The first step is a thorough reading with clear sections. 
         Subsequent steps become more advanced or interactive. 
       Include at least one step with "cameraActivity": true at some point in the sequence. 
       Return ONLY that JSON with no extra text or code fencing.
@@ -165,7 +225,9 @@ export async function POST(request) {
 
     let parsed;
     try {
-      parsed = JSON.parse(rawContent);
+      const sanitized = sanitizeForJSON(rawContent);
+      parsed = JSON.parse(sanitized);
+      parsed = cleanLessonContent(parsed);
     } catch (error) {
       console.error('[generateLesson] Failed to parse lesson JSON:', error);
       return NextResponse.json(
@@ -190,7 +252,8 @@ export async function POST(request) {
               instruction: step.instruction || '',
               commonMistakes: step.commonMistakes || [],
               tips: step.tips || [],
-              cameraActivity: typeof step.cameraActivity === 'boolean' ? step.cameraActivity : false
+              cameraActivity:
+                typeof step.cameraActivity === 'boolean' ? step.cameraActivity : false
             }))
           : []
       },
@@ -200,8 +263,17 @@ export async function POST(request) {
       }
     };
 
-    const insertResult = await lessonsCollection.insertOne(lessonData);
-    console.log('[generateLesson] Inserted lesson _id:', insertResult.insertedId);
+    const upsertResult = await lessonsCollection.updateOne(
+      { lessonId: lessonId },
+      { $set: lessonData },
+      { upsert: true }
+    );
+
+    if (upsertResult.upsertedId) {
+      console.log('[generateLesson] Created a new lesson _id:', upsertResult.upsertedId);
+    } else {
+      console.log('[generateLesson] Updated existing lesson with lessonId:', lessonId);
+    }
 
     return NextResponse.json(parsed, { status: 200 });
 

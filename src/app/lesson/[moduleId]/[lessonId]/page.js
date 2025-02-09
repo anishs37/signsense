@@ -25,6 +25,184 @@ import {
 
 import CameraModule from "@/components/cameraModule";
 
+/** 1) Utility functions for formatting text/markdown-like content. */
+function fixAdjoinedWords(str) {
+  return str.replace(/([a-z])([A-Z])/g, "$1\n$2");
+}
+function forceHeadingsOnNewLine(str) {
+  return str.replace(/(?!^)(#+\s)/g, "\n$1");
+}
+
+function formatMarkdownContent(text) {
+  if (!text) return [];
+
+  text = fixAdjoinedWords(text);
+  text = text.replace(/\$ /g, "\n");
+  text = forceHeadingsOnNewLine(text);
+
+  const sections = text.split(/(?=(^|\n)#+\s)/);
+
+  const parsedSections = sections.map((rawSection) => {
+    const lines = rawSection.trim().split("\n");
+    let level = 0;
+    let title = "";
+    let content = [];
+
+    if (lines[0]?.startsWith("#")) {
+      const headerMatch = lines[0].match(/^(#+)\s+(.*)$/);
+      if (headerMatch) {
+        level = headerMatch[1].length;
+        title = headerMatch[2].trim();
+        lines.shift();
+      }
+    }
+
+    let currentParagraph = [];
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed === "") {
+        if (currentParagraph.length > 0) {
+          content.push(currentParagraph.join(" "));
+          currentParagraph = [];
+        }
+      } else {
+        currentParagraph.push(trimmed);
+      }
+    });
+    if (currentParagraph.length > 0) {
+      content.push(currentParagraph.join(" "));
+    }
+
+    return { level, title, content };
+  });
+
+  return parsedSections.filter((sec) => sec.title || sec.content.length > 0);
+}
+
+function parseParagraph(paragraph) {
+  paragraph = paragraph.replace(/(?<!^)(\s*\d+\.\s+)/g, "\n$1");
+  paragraph = paragraph.replace(/(?<!^)(\s*-\s+)/g, "\n$1");
+
+  const lines = paragraph.split(/\n+/);
+  const bulletPattern = /^\s*[-+*]\s+(.*)$/;
+  const numericPattern = /^\s*\d+\.\s+(.*)$/;
+
+  let allBullets = true;
+  let allNumbers = true;
+  const bulletItems = [];
+  const numberItems = [];
+
+  for (const line of lines) {
+    if (!bulletPattern.test(line)) {
+      allBullets = false;
+    } else {
+      const match = line.match(bulletPattern);
+      if (match) {
+        bulletItems.push(match[1]);
+      }
+    }
+
+    if (!numericPattern.test(line)) {
+      allNumbers = false;
+    } else {
+      const match = line.match(numericPattern);
+      if (match) {
+        numberItems.push(match[1]);
+      }
+    }
+  }
+
+  if (lines.length > 0 && allBullets) {
+    return [{ type: "ul", items: bulletItems }];
+  }
+  if (lines.length > 0 && allNumbers) {
+    return [{ type: "ol", items: numberItems }];
+  }
+
+  return [{ type: "p", text: paragraph }];
+}
+
+function renderFormattedContent(sections) {
+  return sections.map((section, index) => {
+    let HeadingTag = "h5";
+    let headingClass = "text-md mb-2 text-blue-600 font-bold";
+
+    if (section.level === 1) {
+      HeadingTag = "h2";
+      headingClass = "text-2xl mb-4 text-blue-700 font-bold";
+    } else if (section.level === 2) {
+      HeadingTag = "h3";
+      headingClass = "text-xl mb-3 text-blue-600 font-bold";
+    } else if (section.level === 3) {
+      HeadingTag = "h4";
+      headingClass = "text-lg mb-2 text-blue-600 font-bold";
+    } else if (section.level >= 4) {
+      HeadingTag = "h5";
+      headingClass = "text-md mb-2 text-blue-600 font-bold";
+    }
+
+    return (
+      <div key={index} className="mb-6">
+        {section.title &&
+          React.createElement(
+            HeadingTag,
+            { className: headingClass },
+            section.title
+          )}
+
+        {section.content.map((paragraph, pIndex) => {
+          const tokens = parseParagraph(paragraph);
+          return (
+            <div key={pIndex}>
+              {tokens.map((token, tIndex) => {
+                if (token.type === "p") {
+                  return (
+                    <p
+                      key={tIndex}
+                      className="mb-4 text-gray-700 leading-relaxed"
+                    >
+                      {token.text}
+                    </p>
+                  );
+                }
+                if (token.type === "ul") {
+                  return (
+                    <ul
+                      key={tIndex}
+                      className="list-disc list-inside mb-4 text-gray-700 leading-relaxed"
+                    >
+                      {token.items.map((item, i) => (
+                        <li key={i} className="mb-1">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                }
+                if (token.type === "ol") {
+                  return (
+                    <ol
+                      key={tIndex}
+                      className="list-decimal list-inside mb-4 text-gray-700 leading-relaxed"
+                    >
+                      {token.items.map((item, i) => (
+                        <li key={i} className="mb-1">
+                          {item}
+                        </li>
+                      ))}
+                    </ol>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  });
+}
+
 export default function LessonPage() {
   const router = useRouter();
   const params = useParams();
@@ -35,19 +213,14 @@ export default function LessonPage() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [moduleContext, setModuleContext] = useState(null);
 
-  // --- Fetch Lesson Data on Mount ---
   useEffect(() => {
-    const fetchLesson = async () => {
+    const fetchOrLoadLesson = async () => {
       try {
-        // 1. Grab the plan from localStorage
         const planFromStorage = localStorage.getItem("learningPlan");
         if (!planFromStorage) {
           throw new Error("No learningPlan found in localStorage.");
         }
-
         const planObject = JSON.parse(planFromStorage);
-
-        // 2. Find the module with moduleId
         const currentModule = planObject.learningPathway?.find(
           (m) => m.moduleId === params.moduleId
         );
@@ -56,24 +229,38 @@ export default function LessonPage() {
         }
         setModuleContext(currentModule);
 
-        // 3. Optionally load userProfile
-        const userProfile = JSON.parse(localStorage.getItem("userProfile")) || {};
+        const checkRes = await fetch(`/api/checkLesson?lessonId=${params.lessonId}`);
+        if (!checkRes.ok) {
+          throw new Error("Failed to check existing lesson from DB");
+        }
+        const checkData = await checkRes.json();
 
-        // 4. Hit our /api/generateLesson endpoint
-        const response = await fetch("/api/generateLesson", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            lessonId: params.lessonId,
-            moduleContext: currentModule,
-            userProfile,
-          }),
-        });
+        if (checkData.found && checkData.lessonData) {
+          console.log("[LessonPage] Lesson found in DB, skipping generateLesson");
+          const dbLesson = {
+            title: checkData.lessonData.title,
+            duration: checkData.lessonData.duration,
+            content: checkData.lessonData.content
+          };
+          setLesson(dbLesson);
+        } else {
+          console.log("[LessonPage] No lesson in DB, calling generateLesson");
+          const userProfile = JSON.parse(localStorage.getItem("userProfile")) || {};
 
-        if (!response.ok) throw new Error("Failed to fetch lesson");
-        const data = await response.json();
-        // data => { lesson: { title, duration, content: { steps: [...] } } }
-        setLesson(data.lesson);
+          const response = await fetch("/api/generateLesson", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lessonId: params.lessonId,
+              moduleContext: currentModule,
+              userProfile,
+            }),
+          });
+
+          if (!response.ok) throw new Error("Failed to fetch lesson");
+          const data = await response.json();
+          setLesson(data.lesson);
+        }
       } catch (error) {
         console.error("Error:", error);
       } finally {
@@ -82,11 +269,10 @@ export default function LessonPage() {
     };
 
     if (params.moduleId && params.lessonId) {
-      fetchLesson();
+      fetchOrLoadLesson();
     }
-  }, [params.moduleId, params.lessonId]);
+  }, [params.moduleId, params.lessonId, router]);
 
-  // --- Lesson Completion Handler ---
   const handleComplete = () => {
     setShowCelebration(true);
     setTimeout(() => {
@@ -110,7 +296,6 @@ export default function LessonPage() {
     );
   }
 
-  // If lesson is null or the shape isn't what we expect:
   if (!lesson || !lesson.content?.steps?.length) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
@@ -130,17 +315,15 @@ export default function LessonPage() {
     );
   }
 
-  // For convenience
   const steps = lesson.content.steps;
   const totalSteps = steps.length;
   const stepData = steps[currentStep];
-
-  // Compute progress as a percentage (1-based)
   const progressValue = ((currentStep + 1) / totalSteps) * 100;
+
+  const formattedSections = formatMarkdownContent(stepData.instruction);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white relative overflow-hidden">
-      {/* Animated background */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 animate-gradient-x">
           <div className="absolute top-0 -left-1/2 w-[200%] h-[200%] bg-gradient-to-r from-blue-100/30 via-purple-100/30 to-blue-100/30" />
@@ -151,7 +334,6 @@ export default function LessonPage() {
       </div>
 
       <div className="max-w-4xl mx-auto p-6 relative z-10">
-        {/* Header */}
         <motion.header
           className="mb-8"
           initial={{ opacity: 0, y: -20 }}
@@ -159,7 +341,10 @@ export default function LessonPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <Link href="/plan">
-              <Button variant="outline" className="rounded-full hover:scale-105 transition-transform">
+              <Button
+                variant="outline"
+                className="rounded-full hover:scale-105 transition-transform"
+              >
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Back to Plan
               </Button>
@@ -178,7 +363,6 @@ export default function LessonPage() {
           </div>
         </motion.header>
 
-        {/* Step container */}
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStep}
@@ -196,26 +380,22 @@ export default function LessonPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Instruction Text */}
                 <div className="prose max-w-none">
-                  <motion.p
-                    className="text-gray-700"
+                  <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.2 }}
                   >
-                    {stepData.instruction}
-                  </motion.p>
+                    {renderFormattedContent(formattedSections)}
+                  </motion.div>
                 </div>
 
-                {/* Mistakes / Tips */}
                 <motion.div
                   className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
                 >
-                  {/* Watch Out For */}
                   <div className="p-4 bg-red-50 rounded-lg hover:shadow-md transition-shadow">
                     <h4 className="font-medium text-red-800 mb-2 flex items-center gap-2">
                       <AlertCircle className="w-4 h-4" />
@@ -236,9 +416,8 @@ export default function LessonPage() {
                     </ul>
                   </div>
 
-                  {/* Pro Tips */}
                   <div className="p-4 bg-green-50 rounded-lg hover:shadow-md transition-shadow">
-                    <h4 className="font-medium text-green-800 mb-2 flex items-center gap-2">
+                    <h4 className="font-medium text-green-800 mb=2 flex items-center gap=2">
                       <CheckCircle className="w-4 h-4" />
                       Pro Tips
                     </h4>
@@ -258,7 +437,6 @@ export default function LessonPage() {
                   </div>
                 </motion.div>
 
-                {/* If GPT indicates this step has a camera activity, show it here */}
                 {stepData.cameraActivity === true && (
                   <div className="mt-4">
                     <CameraModule />
@@ -266,7 +444,6 @@ export default function LessonPage() {
                 )}
               </CardContent>
 
-              {/* Step navigation footer */}
               <CardFooter className="flex justify-between">
                 <Button
                   variant="outline"
@@ -280,7 +457,6 @@ export default function LessonPage() {
 
                 <Button
                   onClick={() => {
-                    // If we're on the final step, mark the lesson complete
                     if (currentStep === totalSteps - 1) {
                       handleComplete();
                     } else {
@@ -298,7 +474,6 @@ export default function LessonPage() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Celebration animation */}
         <AnimatePresence>
           {showCelebration && (
             <motion.div
