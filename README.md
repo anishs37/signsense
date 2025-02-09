@@ -88,7 +88,6 @@ This comprehensive system creates an immersive, adaptive, and rewarding ASL lear
 [![Arduino][Arduino]][Arduino-url]
 [![Git][Git]][Git-url]
 [![OpenAI API][OpenAI API]][OpenAI-url]
-[![MediaPipe][MediaPipe]][MediaPipe-url]
 [![Three.js][Three.js]][Three.js-url]
 [![MQTT][MQTT]][MQTT-url]
 
