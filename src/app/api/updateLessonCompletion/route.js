@@ -3,14 +3,8 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const { planId, moduleId } = await request.json();
-
-    if (!planId || !moduleId) {
-      return NextResponse.json(
-        { message: 'PlanId and moduleId are required' },
-        { status: 400 }
-      );
-    }
+    const { planId, moduleId, lessonId } = await request.json();
+    console.log('[updateLessonCompletion] Received request:', { planId, moduleId, lessonId });
 
     const uri = process.env.MONGODB_URI;
     const client = new MongoClient(uri);
@@ -19,48 +13,76 @@ export async function POST(request) {
       await client.connect();
       const db = client.db('signsync');
       const plansCollection = db.collection('plans');
+      const lessonsCollection = db.collection('lessons');
 
-      const plan = await plansCollection.findOne(
-        { _id: new ObjectId(planId) }
-      );
+      // First get the lesson from the lessons collection
+      const lesson = await lessonsCollection.findOne({ lessonId, moduleId });
+      if (!lesson) {
+        console.log('[updateLessonCompletion] Lesson not found');
+        return NextResponse.json({ message: 'Lesson not found' }, { status: 404 });
+      }
 
+      console.log('[updateLessonCompletion] Found lesson:', {
+        title: lesson.title,
+        lessonId: lesson.lessonId,
+        moduleId: lesson.moduleId
+      });
+
+      // Get the plan
+      const plan = await plansCollection.findOne({ _id: new ObjectId(planId) });
       if (!plan) {
+        console.log('[updateLessonCompletion] Plan not found');
+        return NextResponse.json({ message: 'Plan not found' }, { status: 404 });
+      }
+
+      // Normalize title for case-insensitive matching
+      const lessonTitleNormalized = lesson.title.trim().toLowerCase();
+      let foundModuleIndex = -1;
+      let foundLessonIndex = -1;
+
+      for (let i = 0; i < plan.pathway.length; i++) {
+        const module = plan.pathway[i];
+
+        if (module.moduleId === moduleId) {
+          for (let j = 0; j < module.subLessons.length; j++) {
+            const subLesson = module.subLessons[j];
+
+            if (subLesson.lessonId === lessonId || subLesson.lessonTitle.trim().toLowerCase() === lessonTitleNormalized) {
+              foundModuleIndex = i;
+              foundLessonIndex = j;
+              break;
+            }
+          }
+        }
+
+        if (foundModuleIndex !== -1) break;
+      }
+
+      if (foundModuleIndex === -1 || foundLessonIndex === -1) {
+        console.log('[updateLessonCompletion] No matching lesson found in plan');
         return NextResponse.json(
-          { message: 'Plan not found' },
+          { message: 'Matching lesson not found in plan' },
           { status: 404 }
         );
       }
 
-      const module = plan.pathway.find(m => m.moduleId === moduleId);
-      if (!module) {
-        return NextResponse.json(
-          { message: 'Module not found' },
-          { status: 404 }
-        );
-      }
+      console.log('[updateLessonCompletion] Found matching lesson:', {
+        moduleIndex: foundModuleIndex,
+        lessonIndex: foundLessonIndex,
+        lessonTitle: plan.pathway[foundModuleIndex].subLessons[foundLessonIndex].lessonTitle
+      });
 
-      const currentCompleted = module.progress.completedLessons;
-      const totalLessons = module.progress.totalLessons;
-
-      if (currentCompleted >= totalLessons) {
-        return NextResponse.json({
-          success: true,
-          message: 'Module already fully completed'
-        });
-      }
-
+      // Update the lesson status in the plan
       const result = await plansCollection.updateOne(
+        { _id: new ObjectId(planId) },
         { 
-          _id: new ObjectId(planId),
-          "pathway.moduleId": moduleId 
-        },
-        { 
-          $inc: { 
-            "pathway.$.progress.completedLessons": 1
-          },
           $set: {
-            "pathway.$.progress.started": true,
+            [`pathway.${foundModuleIndex}.subLessons.${foundLessonIndex}.status`]: "completed",
+            [`pathway.${foundModuleIndex}.progress.started`]: true,
             lastUpdated: new Date()
+          },
+          $inc: { 
+            [`pathway.${foundModuleIndex}.progress.completedLessons`]: 1
           }
         }
       );
@@ -74,10 +96,9 @@ export async function POST(request) {
 
       return NextResponse.json({ 
         success: true,
-        message: 'Lesson completion count incremented successfully',
-        newCompletedCount: currentCompleted + 1,
-        totalLessons: totalLessons
+        message: 'Lesson marked as completed successfully'
       });
+
     } finally {
       await client.close();
     }

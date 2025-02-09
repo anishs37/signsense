@@ -286,7 +286,8 @@ export default function LessonPage() {
     try {
       console.log('Updating lesson completion with:', {
         planId,
-        moduleId: params.moduleId
+        moduleId: params.moduleId,
+        lessonId: params.lessonId // Add this
       });
       
       const response = await fetch('/api/updateLessonCompletion', {
@@ -297,6 +298,7 @@ export default function LessonPage() {
         body: JSON.stringify({
           planId: planId,
           moduleId: params.moduleId,
+          lessonId: params.lessonId // Add this
         }),
       });
       
