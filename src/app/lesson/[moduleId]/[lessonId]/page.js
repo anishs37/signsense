@@ -25,7 +25,6 @@ import {
 
 import CameraModule from "@/components/cameraModule";
 
-/** 1) Utility functions for formatting text/markdown-like content. */
 function fixAdjoinedWords(str) {
   return str.replace(/([a-z])([A-Z])/g, "$1\n$2");
 }
@@ -273,11 +272,13 @@ export default function LessonPage() {
     }
   }, [params.moduleId, params.lessonId, router]);
 
+  // Updated handleComplete: Redirect to /[planId]/plan when lesson is complete.
   const handleComplete = () => {
     setShowCelebration(true);
     setTimeout(() => {
       localStorage.setItem(`lesson-${params.lessonId}-completed`, "true");
-      router.push("/plan");
+      const planId = localStorage.getItem("planId");
+      router.push(`/${planId}/plan`);
     }, 2000);
   };
 

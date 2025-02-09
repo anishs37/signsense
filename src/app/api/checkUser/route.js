@@ -26,6 +26,7 @@ export async function POST(request) {
       if (existingUser) {
         return NextResponse.json({
           exists: true,
+          userId: existingUser._id.toString(),
           activePlanId: existingUser.activePlanId || null
         });
       }

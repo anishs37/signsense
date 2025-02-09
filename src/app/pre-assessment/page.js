@@ -26,6 +26,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function PreAssessment() {
   const router = useRouter();
@@ -35,8 +41,9 @@ export default function PreAssessment() {
   const [isCompleted, setIsCompleted] = useState([false, false, false, false]);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showExistingUserDialog, setShowExistingUserDialog] = useState(false);
-  const [existingPlanId, setExistingPlanId] = useState(null);
-
+  const [showPlanSelection, setShowPlanSelection] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState([]);
+  const [userId, setUserId] = useState(null);
   const [answers, setAnswers] = useState({
     email: '',
     preAssessment: {
@@ -112,8 +119,8 @@ export default function PreAssessment() {
 
       const data = await response.json();
       if (data.exists) {
-        setExistingPlanId(data.activePlanId);
-        setShowExistingUserDialog(true);
+        setUserId(data.userId); // Store the actual user ID
+        fetchUserPlans(data.userId); // Use the user ID to fetch plans
         return true;
       }
       return false;
@@ -122,6 +129,38 @@ export default function PreAssessment() {
       setError('Error checking user status. Please try again.');
       return false;
     }
+  };
+
+  const fetchUserPlans = async (userId) => {
+    try {
+      const response = await fetch(`/api/getUserPlans?userId=${userId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch user plans');
+      }
+  
+      const data = await response.json();
+      if (data.plans && data.plans.length > 0) {
+        setAvailablePlans(data.plans);
+        if (data.plans.length === 1) {
+          handlePlanSelection(data.plans[0]._id);
+        }
+      }
+      setShowExistingUserDialog(true);
+    } catch (error) {
+      console.error('Error fetching plans:', error);
+      setError('Error fetching your learning plans. Please try again.');
+    }
+  };  
+
+  const handlePlanSelection = (planId) => {
+    setShowPlanSelection(false);
+    setShowCelebration(true);
+    localStorage.setItem('userEmail', answers.email);
+    localStorage.setItem('userId', userId);
+    localStorage.setItem('planId', planId);
+    setTimeout(() => {
+      router.push(`${planId}/plan`);
+    }, 2000);
   };
 
   const handleInputChange = async (e) => {
@@ -133,7 +172,6 @@ export default function PreAssessment() {
         email: value
       }));
 
-      // Only validate email field when it's complete
       const isValid = questions[0].validation(value);
       const newCompleted = [...isCompleted];
       newCompleted[0] = isValid;
@@ -177,8 +215,6 @@ export default function PreAssessment() {
     setError('');
 
     const now = new Date();
-
-    // Format data according to MongoDB schema
     const submissionData = {
       email: answers.email,
       preAssessment: {
@@ -193,12 +229,12 @@ export default function PreAssessment() {
         experience: answers.preAssessment.responses.experience,
         goals: answers.preAssessment.responses.goals,
         learningStyle: answers.preAssessment.responses.learningStyle,
+        createdAt: now,
         lastActive: now
       }
     };
 
     try {
-      // Generate the learning plan
       const planRes = await fetch('/api/generatePlan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -218,12 +254,14 @@ export default function PreAssessment() {
 
       setShowCelebration(true);
 
-      // Store user and plan data
+      // Store user data correctly
+      localStorage.setItem('userEmail', answers.email);
       localStorage.setItem('userId', plan.userId);
+      localStorage.setItem('planId', plan._id);
       localStorage.setItem('learningPlan', JSON.stringify(plan));
 
       setTimeout(() => {
-        router.push('/plan');
+        router.push(`/plan/${plan._id}`);
       }, 2000);
 
     } catch (error) {
@@ -235,11 +273,12 @@ export default function PreAssessment() {
   };
 
   const handleContinueExisting = () => {
-    setShowCelebration(true);
-    localStorage.setItem('planId', existingPlanId);
-    setTimeout(() => {
-      router.push('/plan');
-    }, 2000);
+    if (availablePlans.length === 1) {
+      handlePlanSelection(availablePlans[0]._id);
+    } else {
+      setShowExistingUserDialog(false);
+      setShowPlanSelection(true);
+    }
   };
 
   const handleCreateNew = () => {
@@ -401,6 +440,39 @@ export default function PreAssessment() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showPlanSelection} onOpenChange={setShowPlanSelection}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Select Your Learning Plan</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {availablePlans.map((plan) => (
+              <Button
+                key={plan._id}
+                onClick={() => handlePlanSelection(plan._id)}
+                variant="outline"
+                className="w-full justify-start text-left h-auto py-4"
+              >
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">
+                    {plan.displayTitle || 'Untitled Plan'}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    Created: {new Date(plan.createdAt).toLocaleDateString()}
+                  </span>
+                  {plan.completedAt && (
+                    <span className="text-sm text-green-600">
+                      Completed: {new Date(plan.completedAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+                <ArrowRight className="ml-auto h-4 w-4" />
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AnimatePresence>
         {showCelebration && (
