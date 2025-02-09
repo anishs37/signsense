@@ -93,10 +93,29 @@ export async function POST(request) {
         ]
       }
 
-      The plan should have 5 modules, each with 4 subLessons. Make them relevant to:
+      The plan should have 3 modules, each with 4 subLessons. Make them relevant to:
       - The user's experience: "${experience}"
       - The user's goals: "${goals}"
       - The user's learning style: "${learningStyle}"
+
+      THIS IS THE MOST IMPORTANT PART. Please keep in mind that for my application I
+      only have data on the letters A-Y (not J), the numbers 1-9, and the phrase
+      "I love you." Perhaps one way to go about this is have lessons be based on the difficulty
+      of showing these signs accurately, but please make sure a lesson does not go out of the scope 
+      of this major constraint. For example, no lesson on "common phrases" or whatever, REGARDLESS
+      of what the user inputs in preferences. Also, make sure to append a json_path as shown below. The json_path
+      will start with either alphabet/, numbers/, or phrases/. If the lesson will be to do, let's say, the
+      letter a, the path will be alphabet/a.json (and same for every other letter; just do not give j or z).
+      If the lesson is number 1-9, the json_path will be numbers/1.json, for example. And finally, if the
+      lesson is the phrase "I love you," it will just be phrases/i love you.json. Make sure you do not
+      include ANYTHING related to the lesson outside of this. Otherwise I will be in deep trouble. Also, make
+      sure that each lesson is only for one letter/number/phrase. Finally, let me be very clear. These are
+      the ONLY folders. This is not an example for you to generat more folders. These are quite literally the
+      only folders available. And th eonly files availables are a-y (other than j).json for the letter folder,
+      1-9 for the numbres folder, and ONLY ONE PHRASE AVAILABLE called "I love you" for the phrases folder. And
+      as one more reminder, make sure the sublessons themselves are correlated to the json path and that each
+      lesson is only based on one letter or phrase or number. Make sure the lesson title/description actually
+      somewhat matches the json path, and not be something silly. Thanks!
 
       Return only valid JSON. Double-check all keys are quoted properly.
       Example:
@@ -112,6 +131,7 @@ export async function POST(request) {
                 "lessonId": "101",
                 "lessonTitle": "Ex. Fingerspelling Basics",
                 "description": "Learn the alphabet"
+                "json_path": "alphabet/a.json"
               }
             ]
           },
@@ -138,27 +158,38 @@ export async function POST(request) {
     let parsedPlan;
 
     try {
-      sanitizedContent = rawContent
-        .replace(/\\n/g, '')
-        .replace(/\\"/g, '"')
-        .replace(/'/g, '"')
-        .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3')
-        .replace(/,\s*([}\]])/g, '$1');
-
-      sanitizedContent = completeJSON(sanitizedContent);
-      parsedPlan = JSON.parse(sanitizedContent);
-
+      console.log("[generatePlan] Raw content:", rawContent);
+      
+      // Try parsing the raw content first as it might already be valid JSON
+      try {
+        parsedPlan = JSON.parse(rawContent);
+      } catch (initialError) {
+        // If direct parsing fails, then try sanitization
+        sanitizedContent = rawContent
+          .replace(/\\n/g, '')  // Remove escaped newlines
+          .replace(/\\"/g, '"') // Replace escaped quotes
+          .replace(/'/g, '"')   // Replace single quotes with double quotes
+          .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3')  // Quote unquoted keys
+          .replace(/,\s*([}\]])/g, '$1');  // Remove trailing commas
+    
+        console.log("[generatePlan] Sanitized content:", sanitizedContent);
+        
+        // Try parsing the sanitized content
+        parsedPlan = JSON.parse(sanitizedContent);
+      }
+    
       if (!parsedPlan.learningPathway || !Array.isArray(parsedPlan.learningPathway)) {
         throw new Error('Invalid learningPathway structure');
       }
     } catch (err) {
       console.error('[generatePlan] JSON parsing error:', err);
-      console.error('[generatePlan] Sanitized content:', sanitizedContent);
+      console.error('[generatePlan] Content that failed to parse:', sanitizedContent || rawContent);
       return NextResponse.json(
         {
           message: 'Error parsing the AI response. Please try again.',
-          rawContent,
-          error: err.message
+          error: err.message,
+          rawContent: rawContent,
+          sanitizedContent: sanitizedContent || null
         },
         { status: 500 }
       );
@@ -252,7 +283,8 @@ export async function POST(request) {
                 lessonTitle: lesson.lessonTitle,
                 description: lesson.description || "",
                 order: lessonIndex + 1,
-                status: 'not_started'
+                status: 'not_started',
+                json_path: lesson.json_path || "" // Added this line to include json_path
               };
             })
           };
