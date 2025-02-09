@@ -211,6 +211,15 @@ export default function LessonPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
   const [moduleContext, setModuleContext] = useState(null);
+  const [planId, setPlanId] = useState(null);
+
+  // Grab the planId from localStorage on mount.
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedPlanId = localStorage.getItem("planId");
+      setPlanId(storedPlanId);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchOrLoadLesson = async () => {
@@ -239,7 +248,7 @@ export default function LessonPage() {
           const dbLesson = {
             title: checkData.lessonData.title,
             duration: checkData.lessonData.duration,
-            content: checkData.lessonData.content
+            content: checkData.lessonData.content,
           };
           setLesson(dbLesson);
         } else {
@@ -277,7 +286,6 @@ export default function LessonPage() {
     setShowCelebration(true);
     setTimeout(() => {
       localStorage.setItem(`lesson-${params.lessonId}-completed`, "true");
-      const planId = localStorage.getItem("planId");
       router.push(`/${planId}/plan`);
     }, 2000);
   };
@@ -285,11 +293,7 @@ export default function LessonPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
-        <motion.div
-          className="text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-        >
+        <motion.div className="text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your lesson...</p>
         </motion.div>
@@ -307,7 +311,7 @@ export default function LessonPage() {
             <p className="text-gray-600 mb-4">
               Unable to load the lesson. Please try again.
             </p>
-            <Link href="/plan">
+            <Link href={planId ? `/${planId}/plan` : "/plan"}>
               <Button className="w-full">Return to Learning Plan</Button>
             </Link>
           </CardContent>
@@ -335,17 +339,10 @@ export default function LessonPage() {
       </div>
 
       <div className="max-w-4xl mx-auto p-6 relative z-10">
-        <motion.header
-          className="mb-8"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.header className="mb-8" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center justify-between mb-4">
-            <Link href="/plan">
-              <Button
-                variant="outline"
-                className="rounded-full hover:scale-105 transition-transform"
-              >
+            <Link href={planId ? `/${planId}/plan` : "/plan"}>
+              <Button variant="outline" className="rounded-full hover:scale-105 transition-transform">
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Back to Plan
               </Button>
@@ -382,11 +379,7 @@ export default function LessonPage() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="prose max-w-none">
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                  >
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
                     {renderFormattedContent(formattedSections)}
                   </motion.div>
                 </div>
