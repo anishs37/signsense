@@ -281,14 +281,40 @@ export default function LessonPage() {
     }
   }, [params.moduleId, params.lessonId, router]);
 
-  // Updated handleComplete: Redirect to /[planId]/plan when lesson is complete.
-  const handleComplete = () => {
-    setShowCelebration(true);
-    setTimeout(() => {
-      localStorage.setItem(`lesson-${params.lessonId}-completed`, "true");
-      router.push(`/${planId}/plan`);
-    }, 2000);
-  };
+  const handleComplete = async () => {
+    setShowCelebration(true);    
+    try {
+      console.log('Updating lesson completion with:', {
+        planId,
+        moduleId: params.moduleId
+      });
+      
+      const response = await fetch('/api/updateLessonCompletion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          planId: planId,
+          moduleId: params.moduleId,
+        }),
+      });
+      
+      const data = await response.json();
+      console.log('Update response:', data);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update lesson completion status: ${data.message}`);
+      }
+      
+      localStorage.setItem(`lesson-${params.lessonId}-completed`, 'true');
+      setTimeout(() => {
+        router.push(`/${planId}/plan`);
+      }, 2000);
+    } catch (error) {
+      console.error('Error updating lesson completion:', error);
+    }
+  };  
 
   if (loading) {
     return (
