@@ -6,6 +6,51 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const perplexity = new OpenAI({
+  apiKey: process.env.PERPLEXITY_API_KEY,
+  baseURL: 'https://api.perplexity.ai'
+});
+
+function sanitizeForJSON(str) {
+  return str.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+}
+
+function cleanText(text) {
+  if (!text) return text;
+  let cleaned = text.replace(/\[\d+\]/g, '');
+  cleaned = cleaned.replace(/\[[A-Za-z]\d+\]/g, '');
+  cleaned = cleaned.replace(/\[[^\]]*\d[^\]]*\]/g, '');
+  cleaned = cleaned.replace(/\s+/g, ' ');  
+  return cleaned.trim();
+}
+
+function cleanLessonContent(content) {
+  if (!content) return content;
+
+  if (typeof content === 'string') {
+    return cleanText(content);
+  }
+
+  if (Array.isArray(content)) {
+    return content.map(item => {
+      if (typeof item === 'string') {
+        return cleanText(item);
+      }
+      return cleanLessonContent(item);
+    });
+  }
+
+  if (typeof content === 'object') {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(content)) {
+      cleaned[key] = cleanLessonContent(value);
+    }
+    return cleaned;
+  }
+
+  return content;
+}
+
 const completeJSON = (jsonString) => {
   let sanitized = jsonString;
   const stack = [];
@@ -47,11 +92,117 @@ const completeJSON = (jsonString) => {
   return sanitized;
 };
 
+async function generateLessonContent(lessonInfo) {
+  const { moduleId, moduleTitle, description, estimatedDuration, currentSubLesson, userProfile } = lessonInfo;
+
+  let userDesc = '';
+  if (userProfile) {
+    userDesc = `
+      This user has:
+      - Experience: ${userProfile.experience || 'unknown'}
+      - Goals: ${userProfile.goals || 'unknown'}
+      - Learning Style: ${userProfile.learningStyle || 'unspecified'}
+    `;
+  }
+
+  const systemPrompt = `
+    You are an expert ASL tutor, capable of generating detailed, 
+    step-by-step lesson content based on provided context. 
+    Always respond with valid JSON only, with no extra text.
+    Your explanations should be well-structured with clear sections and paragraph breaks.
+    Use markdown headers (# for main headers, ## for subheaders) to organize content.
+    Always add a line break (it must be $) after each header before starting the paragraph.
+  `;
+
+  const userPrompt = `
+    The user is currently on module "${moduleId}" titled "${moduleTitle}".
+    Module description: "${description}"
+    Estimated module duration: "${estimatedDuration}".
+    Sub-lesson context: ${JSON.stringify(currentSubLesson || {}, null, 2)}
+    ${userDesc}
+
+    Please generate a single lesson in JSON with this structure:
+    {
+      "lesson": {
+        "title": "Some Lesson Title",
+        "duration": "About how long (e.g. '10-15 minutes')",
+        "content": {
+          "steps": [
+            {
+              "title": "Step 1 Title",
+              "instruction": "Structure your content like this:
+                # Main Topic Header
+                Introduction paragraph giving an overview...
+
+                ## Key Concept 1
+                Detailed explanation of the first important point...
+
+                ## Key Concept 2
+                In-depth exploration of the second concept...
+
+                ## Practice Method
+                Specific instructions for practicing...",
+              "commonMistakes": ["..."],
+              "tips": ["..."],
+              "cameraActivity": false
+            },
+            {
+              "title": "Step 2 Title",
+              "instruction": "Use similar markdown structure for progressive steps...",
+              "commonMistakes": ["..."],
+              "tips": ["..."],
+              "cameraActivity": true
+            }
+          ]
+        }
+      }
+    }
+
+    Each step should have:
+    - "title": Clear, concise title
+    - "instruction": Well-structured content using markdown headers (#, ##) and clear paragraph breaks
+    - "commonMistakes": List of specific mistakes to avoid
+    - "tips": Practical tips for success
+    - "cameraActivity": Boolean indicating if camera practice is needed
+
+    Instructions should be organized into clear sections with:
+    1. A main header (#) introducing the topic
+    2. Multiple subheaders (##) breaking down concepts
+    3. Clear paragraph breaks between sections
+    4. Progressive complexity from theory to practice
+
+    Make sure the lesson escalates in depth: 
+      The first step is a thorough reading with clear sections. 
+      Subsequent steps become more advanced or interactive. 
+    Include at least one step with "cameraActivity": true at some point in the sequence. 
+    Return ONLY that JSON with no extra text or code fencing.
+  `;
+
+  const completion = await perplexity.chat.completions.create({
+    model: 'sonar-pro',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    temperature: 0.7,
+  });
+
+  const rawContent = completion.choices[0].message.content.trim();
+  console.log('[generateLesson] Perplexity raw lesson content:', rawContent);
+  
+  const sanitized = sanitizeForJSON(rawContent);
+  const parsed = JSON.parse(sanitized);
+  return cleanLessonContent(parsed);
+}
+
 export async function POST(request) {
+  let client;
+
   try {
     const body = await request.json();
     console.log('[generatePlan] Received request body:', body);
 
+    // Extract user information
     const experience = body.preAssessment?.responses?.experience;
     const goals = body.preAssessment?.responses?.goals;
     const learningStyle = body.preAssessment?.responses?.learningStyle;
@@ -65,6 +216,7 @@ export async function POST(request) {
       );
     }
 
+    // Generate learning plan using OpenAI
     const systemPrompt = `
       You are an expert ASL tutor. The user has given you:
       - Experience: ${experience}
@@ -154,166 +306,205 @@ export async function POST(request) {
     const rawContent = completion.choices[0].message.content.trim();
     console.log('[generatePlan] GPT raw content:', rawContent);
 
-    let sanitizedContent;
     let parsedPlan;
-
     try {
-      console.log("[generatePlan] Raw content:", rawContent);
+      parsedPlan = JSON.parse(rawContent);
+    } catch (initialError) {
+      const sanitizedContent = rawContent
+        .replace(/\\n/g, '')
+        .replace(/\\"/g, '"')
+        .replace(/'/g, '"')
+        .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3')
+        .replace(/,\s*([}\]])/g, '$1');
       
-      // Try parsing the raw content first as it might already be valid JSON
-      try {
-        parsedPlan = JSON.parse(rawContent);
-      } catch (initialError) {
-        // If direct parsing fails, then try sanitization
-        sanitizedContent = rawContent
-          .replace(/\\n/g, '')  // Remove escaped newlines
-          .replace(/\\"/g, '"') // Replace escaped quotes
-          .replace(/'/g, '"')   // Replace single quotes with double quotes
-          .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3')  // Quote unquoted keys
-          .replace(/,\s*([}\]])/g, '$1');  // Remove trailing commas
-    
-        console.log("[generatePlan] Sanitized content:", sanitizedContent);
-        
-        // Try parsing the sanitized content
-        parsedPlan = JSON.parse(sanitizedContent);
-      }
-    
-      if (!parsedPlan.learningPathway || !Array.isArray(parsedPlan.learningPathway)) {
-        throw new Error('Invalid learningPathway structure');
-      }
-    } catch (err) {
-      console.error('[generatePlan] JSON parsing error:', err);
-      console.error('[generatePlan] Content that failed to parse:', sanitizedContent || rawContent);
-      return NextResponse.json(
-        {
-          message: 'Error parsing the AI response. Please try again.',
-          error: err.message,
-          rawContent: rawContent,
-          sanitizedContent: sanitizedContent || null
-        },
-        { status: 500 }
-      );
+      parsedPlan = JSON.parse(sanitizedContent);
     }
 
+    // MongoDB Setup
     const uri = process.env.MONGODB_URI;
-    const client = new MongoClient(uri);
+    client = new MongoClient(uri);
+    await client.connect();
+    const db = client.db('signsync');
+    
+    const usersCollection = db.collection('users');
+    const lessonsCollection = db.collection('lessons');
+    let userId;
+    
+    const now = new Date();
 
-    try {
-      await client.connect();
-      const db = client.db('signsync');
-      
-      const usersCollection = db.collection('users');
-      let userId;
-      
-      const now = new Date();
-      
-      // Check if user exists - using body.email now
-      const existingUser = await usersCollection.findOne({ email: body.email });
-      if (existingUser) {
-        userId = existingUser._id;
-
-        // Update existing user
-        await usersCollection.updateOne(
-          { _id: userId },
-          {
-            $set: {
-              'profile.experience': experience,
-              'profile.goals': goals,
-              'profile.learningStyle': learningStyle,
-              'profile.lastActive': now,
-              'preAssessment.completedAt': now,
-              'preAssessment.responses': {
-                experience,
-                goals,
-                learningStyle
-              }
-            }
-          }
-        );
-      } else {
-        // Create new user - using body.email here too
-        const userDocument = {
-          email: body.email,
-          profile: {
-            experience: experience,
-            goals: goals,
-            learningStyle: learningStyle,
-            createdAt: now,
-            lastActive: now
-          },
-          preAssessment: {
-            completedAt: now,
-            responses: {
-              experience: experience,
-              goals: goals,
-              learningStyle: learningStyle
-            }
-          }
-        };
-        const userResult = await usersCollection.insertOne(userDocument);
-        userId = userResult.insertedId;
-      }
-
-      // Prepare the plan document
-      const planDocument = {
-        userId: userId,
-        status: 'active',
-        generatedFrom: {
-          experience: experience,
-          goals: goals,
-          learningStyle: learningStyle
-        },
-        createdAt: now,
-        lastUpdated: now,
-        pathway: parsedPlan.learningPathway.map((module, moduleIndex) => {
-          return {
-            moduleId: module.moduleId,
-            name: module.name,
-            description: module.description || "",
-            estimatedDuration: module.estimatedDuration || "2 weeks",
-            order: moduleIndex + 1,
-            progress: {
-              started: false,
-              completedLessons: 0,
-              totalLessons: module.subLessons.length
-            },
-            subLessons: module.subLessons.map((lesson, lessonIndex) => {
-              return {
-                lessonId: lesson.lessonId,
-                lessonTitle: lesson.lessonTitle,
-                description: lesson.description || "",
-                order: lessonIndex + 1,
-                status: 'not_started',
-                json_path: lesson.json_path || "" // Added this line to include json_path
-              };
-            })
-          };
-        })
-      };
-
-      // Insert the plan
-      const plansCollection = db.collection('plans');
-      const result = await plansCollection.insertOne(planDocument);
-      
-      // Update user with activePlanId
+    // Handle user creation/update
+    const existingUser = await usersCollection.findOne({ email: body.email });
+    if (existingUser) {
+      userId = existingUser._id;
       await usersCollection.updateOne(
         { _id: userId },
-        { $set: { activePlanId: result.insertedId } }
+        {
+          $set: {
+            'profile.experience': experience,
+            'profile.goals': goals,
+            'profile.learningStyle': learningStyle,
+            'profile.lastActive': now,
+            'preAssessment.completedAt': now,
+            'preAssessment.responses': {
+              experience,
+              goals,
+              learningStyle
+            }
+          }
+        }
       );
-
-      // Add extra info to the response
-      parsedPlan._id = result.insertedId;
-      parsedPlan.userId = userId;
-
-      return NextResponse.json(parsedPlan, { status: 200 });
-    } finally {
-      await client.close();
+    } else {
+      const userDocument = {
+        email: body.email,
+        profile: {
+          experience,
+          goals,
+          learningStyle,
+          createdAt: now,
+          lastActive: now
+        },
+        preAssessment: {
+          completedAt: now,
+          responses: {
+            experience,
+            goals,
+            learningStyle
+          }
+        }
+      };
+      const userResult = await usersCollection.insertOne(userDocument);
+      userId = userResult.insertedId;
     }
+
+    // Remove existing lessons for this user
+    await lessonsCollection.deleteMany({ userEmail: body.email });
+
+    // Create lessons with content
+    const lessonPromises = [];
+    for (const module of parsedPlan.learningPathway) {
+      for (const lesson of module.subLessons) {
+        const lessonInfo = {
+          moduleId: module.moduleId,
+          moduleTitle: module.name,
+          description: module.description,
+          estimatedDuration: module.estimatedDuration,
+          currentSubLesson: lesson,
+          userProfile: {
+            experience,
+            goals,
+            learningStyle
+          }
+        };
+
+        try {
+          const lessonContent = await generateLessonContent(lessonInfo);
+          
+          const lessonDocument = {
+            _id: new ObjectId(),
+            userEmail: body.email,
+            userId: userId,
+            moduleId: module.moduleId,
+            uniqueLessonId: `${body.email}_${module.moduleId}_${lesson.lessonId}`,
+            lessonId: `${module.moduleId}_${lesson.lessonId}`,
+            originalLessonId: lesson.lessonId,
+            lessonTitle: lesson.lessonTitle,
+            description: lesson.description || "",
+            json_path: lesson.json_path || "",
+            content: lessonContent.lesson,
+            status: 'not_started',
+            progress: {
+              started: false,
+              completed: false,
+              startedAt: null,
+              completedAt: null,
+              lastAttempt: null
+            },
+            createdAt: now,
+            lastUpdated: now
+          };
+
+          lessonPromises.push(lessonsCollection.insertOne(lessonDocument));
+        } catch (error) {
+          console.error(`Error generating content for lesson ${lesson.lessonId}:`, error);
+        }
+      }
+    }
+
+    // Wait for all lesson insertions to complete
+    const lessonResults = await Promise.all(lessonPromises);
+
+    // Create a map of lessonIds to their MongoDB _ids
+    const lessonIdMap = {};
+    lessonResults.forEach((result, index) => {
+      if (result.insertedId) {
+        lessonIdMap[index] = result.insertedId;
+      }
+    });
+
+    // Create the plan document
+    const planDocument = {
+      userId: userId,
+      userEmail: body.email,
+      status: 'active',
+      generatedFrom: {
+        experience,
+        goals,
+        learningStyle
+      },
+      createdAt: now,
+      lastUpdated: now,
+      pathway: parsedPlan.learningPathway.map((module, moduleIndex) => {
+        return {
+          moduleId: module.moduleId,
+          name: module.name,
+          description: module.description || "",
+          estimatedDuration: module.estimatedDuration || "2 weeks",
+          order: moduleIndex + 1,
+          progress: {
+            started: false,
+            completedLessons: 0,
+            totalLessons: module.subLessons.length
+          },
+          subLessons: module.subLessons.map((lesson, lessonIndex) => {
+            const key = `${moduleIndex}_${lessonIndex}`;
+            return {
+              lessonId: lesson.lessonId,
+              mongoId: lessonIdMap[key],
+              lessonTitle: lesson.lessonTitle,
+              description: lesson.description || "",
+              order: lessonIndex + 1,
+              status: 'not_started',
+              json_path: lesson.json_path || ""
+            };
+          })
+        };
+      })
+    };
+
+    // Insert the plan
+    const plansCollection = db.collection('plans');
+    const result = await plansCollection.insertOne(planDocument);
+    
+    // Update user with activePlanId
+    await usersCollection.updateOne(
+      { _id: userId },
+      { $set: { activePlanId: result.insertedId } }
+    );
+
+    // Add extra info to the response
+    parsedPlan._id = result.insertedId;
+    parsedPlan.userId = userId;
+
+    return NextResponse.json(parsedPlan, { status: 200 });
   } catch (error) {
     console.error('[generatePlan] Unexpected error:', error);
     return NextResponse.json(
       { message: 'Server error: ' + error.message },
       { status: 500 }
     );
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
 }

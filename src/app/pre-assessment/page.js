@@ -260,7 +260,7 @@ export default function PreAssessment() {
       localStorage.setItem('learningPlan', JSON.stringify(plan));
 
       setTimeout(() => {
-        router.push(`/plan/${plan._id}`);
+        router.push(`${plan._id}/plan`);
       }, 2000);
 
     } catch (error) {
