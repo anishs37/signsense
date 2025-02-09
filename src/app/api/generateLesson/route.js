@@ -1,28 +1,89 @@
 import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
+import { MongoClient, ObjectId } from 'mongodb';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const perplexity = new OpenAI({
+  apiKey: process.env.PERPLEXITY_API_KEY,
+  baseURL: 'https://api.perplexity.ai'
 });
 
 export async function POST(request) {
+  let client;
+
   try {
     const body = await request.json();
     console.log('[generateLesson] Received request body:', body);
 
-    const { lessonId, moduleContext, userProfile } = body;
-    if (!lessonId || !moduleContext) {
-      console.error('[generateLesson] Missing lessonId or moduleContext.');
+    const { planId, lessonId, moduleContext, userProfile } = body;
+
+    if (!lessonId) {
+      console.error('[generateLesson] Missing lessonId.');
+      return NextResponse.json({ message: 'Missing lessonId' }, { status: 400 });
+    }
+
+    const uri = process.env.MONGODB_URI;
+    client = new MongoClient(uri);
+    await client.connect();
+    const db = client.db('signsync');
+    const plansCollection = db.collection('plans');
+    const lessonsCollection = db.collection('lessons');
+
+    let moduleId;
+    let moduleTitle;
+    let description;
+    let estimatedDuration = 'N/A';
+    let currentSubLesson = null;
+
+    if (planId) {
+      const plan = await plansCollection.findOne({ _id: new ObjectId(planId) });
+      if (!plan) {
+        console.error(`[generateLesson] No plan found with _id=${planId}`);
+        return NextResponse.json({ message: 'Plan not found' }, { status: 404 });
+      }
+
+      const moduleEntry = plan.pathway.find((mod) =>
+        mod.subLessons.some((sl) => sl.lessonId === lessonId)
+      );
+
+      if (!moduleEntry) {
+        console.error('[generateLesson] No module found containing lessonId:', lessonId);
+        return NextResponse.json({ message: 'Module not found in plan' }, { status: 404 });
+      }
+
+      currentSubLesson = moduleEntry.subLessons.find((sl) => sl.lessonId === lessonId);
+      if (!currentSubLesson) {
+        console.error('[generateLesson] SubLesson not found in the module:', lessonId);
+        return NextResponse.json({ message: 'SubLesson not found' }, { status: 404 });
+      }
+
+      moduleId = moduleEntry.moduleId;
+      moduleTitle = moduleEntry.name;
+      description = moduleEntry.description;
+      estimatedDuration = moduleEntry.estimatedDuration || 'N/A';
+    }
+    else if (moduleContext) {
+      moduleId = moduleContext.moduleId;
+      moduleTitle = moduleContext.name || 'Untitled Module';
+      description = moduleContext.description || '';
+      estimatedDuration = moduleContext.estimatedDuration || 'N/A';
+
+      if (Array.isArray(moduleContext.subLessons)) {
+        currentSubLesson = moduleContext.subLessons.find((sl) => sl.lessonId === lessonId);
+      }
+      if (!currentSubLesson) {
+        console.warn(
+          '[generateLesson] SubLesson not found in moduleContext for lessonId:',
+          lessonId
+        );
+      }
+    } else {
+      console.error('[generateLesson] Missing both planId and moduleContext.');
       return NextResponse.json(
-        { message: 'Missing lesson data' },
+        { message: 'Missing planId or moduleContext to generate lesson' },
         { status: 400 }
       );
     }
 
-    // Pull out fields from moduleContext you might want to show GPT
-    const { moduleId, moduleTitle, description, estimatedDuration, subLessons } = moduleContext;
-
-    // If userProfile has fields for experience, goals, learningStyle, you can incorporate them:
     let userDesc = '';
     if (userProfile) {
       userDesc = `
@@ -33,10 +94,6 @@ export async function POST(request) {
       `;
     }
 
-    // Optionally find the subLesson that matches lessonId
-    const currentSubLesson = subLessons?.find(sl => sl.lessonId === lessonId);
-
-    // Construct your GPT prompts
     const systemPrompt = `
       You are an expert ASL tutor, capable of generating detailed, 
       step-by-step lesson content based on provided context. 
@@ -60,11 +117,18 @@ export async function POST(request) {
             "steps": [
               {
                 "title": "Step 1 Title",
-                "instruction": "Step 1 instructions for the user",
+                "instruction": "Very in-depth textual explanation (like a textbook or blog)... (at least four paragraphs)",
                 "commonMistakes": ["..."],
-                "tips": ["..."]
+                "tips": ["..."],
+                "cameraActivity": false
               },
-              ...
+              {
+                "title": "Step 2 Title",
+                "instruction": "Proceed to more complex or interactive material...",
+                "commonMistakes": ["..."],
+                "tips": ["..."],
+                "cameraActivity": true
+              }
             ]
           }
         }
@@ -73,30 +137,32 @@ export async function POST(request) {
       Each step should have:
       - "title"
       - "instruction"
-      - "commonMistakes" (array of strings)
-      - "tips" (array of strings)
+      - "commonMistakes"
+      - "tips"
+      - "cameraActivity"
 
-      Return ONLY that JSON object with no extra text or code fencing.
+      Make sure the lesson escalates in depth: 
+        The first step is a thorough reading. 
+        Subsequent steps become more advanced or interactive. 
+      Include at least one step with "cameraActivity": true at some point in the sequence. 
+      Return ONLY that JSON with no extra text or code fencing.
     `;
 
     console.log('[generateLesson] systemPrompt:', systemPrompt);
     console.log('[generateLesson] userPrompt:', userPrompt);
 
-    // Call GPT
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo', // or 'gpt-4' if you have access
+    const completion = await perplexity.chat.completions.create({
+      model: 'sonar-pro',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.7,
-      max_tokens: 1200,
     });
 
     const rawContent = completion.choices[0].message.content.trim();
-    console.log('[generateLesson] GPT raw lesson content:', rawContent);
+    console.log('[generateLesson] Perplexity raw lesson content:', rawContent);
 
-    // Attempt to parse GPT's JSON
     let parsed;
     try {
       parsed = JSON.parse(rawContent);
@@ -111,7 +177,32 @@ export async function POST(request) {
       );
     }
 
-    // Return the JSON
+    const lessonData = {
+      lessonId: lessonId,
+      moduleId: moduleId || 'unknown_module',
+      title: parsed.lesson?.title || 'Untitled Lesson',
+      duration: parsed.lesson?.duration || 'N/A',
+      content: {
+        steps: Array.isArray(parsed.lesson?.content?.steps)
+          ? parsed.lesson.content.steps.map((step, i) => ({
+              order: i + 1,
+              title: step.title || `Step ${i + 1}`,
+              instruction: step.instruction || '',
+              commonMistakes: step.commonMistakes || [],
+              tips: step.tips || [],
+              cameraActivity: typeof step.cameraActivity === 'boolean' ? step.cameraActivity : false
+            }))
+          : []
+      },
+      metadata: {
+        version: 1,
+        lastUpdated: new Date()
+      }
+    };
+
+    const insertResult = await lessonsCollection.insertOne(lessonData);
+    console.log('[generateLesson] Inserted lesson _id:', insertResult.insertedId);
+
     return NextResponse.json(parsed, { status: 200 });
 
   } catch (error) {
@@ -120,5 +211,9 @@ export async function POST(request) {
       { message: 'Server error: ' + error.message },
       { status: 500 }
     );
+  } finally {
+    if (client) {
+      await client.close();
+    }
   }
 }

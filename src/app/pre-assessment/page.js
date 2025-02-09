@@ -6,30 +6,77 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { HandMetal, Sparkles, Brain, Loader2, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { 
+  HandMetal, 
+  Sparkles, 
+  Brain, 
+  Loader2, 
+  ChevronRight, 
+  CheckCircle2, 
+  Mail,
+  ArrowRight
+} from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function PreAssessment() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState(0);
-  const [isCompleted, setIsCompleted] = useState([false, false, false]);
+  const [isCompleted, setIsCompleted] = useState([false, false, false, false]);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [showExistingUserDialog, setShowExistingUserDialog] = useState(false);
+  const [existingPlanId, setExistingPlanId] = useState(null);
 
   const [answers, setAnswers] = useState({
-    experience: '',
-    goals: '',
-    learningStyle: '',
+    email: '',
+    preAssessment: {
+      completedAt: null,
+      responses: {
+        experience: '',
+        goals: '',
+        learningStyle: ''
+      }
+    },
+    profile: {
+      experience: '',
+      goals: '',
+      learningStyle: '',
+      createdAt: new Date(),
+      lastActive: new Date()
+    }
   });
 
   const questions = [
+    {
+      field: 'email',
+      title: "Welcome to SignSync!",
+      question: "First, what's your email address?",
+      placeholder: "Enter your email address",
+      icon: Mail,
+      color: "text-primary",
+      validation: (value) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(value);
+      }
+    },
     {
       field: 'experience',
       title: "Let's start with your ASL journey!",
       question: "What's your current experience with ASL?",
       placeholder: "e.g., total beginner, know the alphabet...",
       icon: HandMetal,
-      color: "text-primary"
+      color: "text-primary",
+      validation: (value) => value.length >= 3
     },
     {
       field: 'goals',
@@ -37,7 +84,8 @@ export default function PreAssessment() {
       question: "What would you like to achieve with ASL?",
       placeholder: "e.g., talk to a friend, professional setting...",
       icon: Sparkles,
-      color: "text-accent"
+      color: "text-accent",
+      validation: (value) => value.length >= 3
     },
     {
       field: 'learningStyle',
@@ -45,63 +93,158 @@ export default function PreAssessment() {
       question: "How do you learn best?",
       placeholder: "e.g., visual learner, interactive practice...",
       icon: Brain,
-      color: "text-secondary"
+      color: "text-secondary",
+      validation: (value) => value.length >= 3
     }
   ];
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setAnswers(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    const newCompleted = [...isCompleted];
-    newCompleted[currentStep] = (value.length >= 3);
-    setIsCompleted(newCompleted);
+  const checkExistingUser = async (email) => {
+    try {
+      const response = await fetch('/api/checkUser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check user status');
+      }
+
+      const data = await response.json();
+      if (data.exists) {
+        setExistingPlanId(data.activePlanId);
+        setShowExistingUserDialog(true);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking user:', error);
+      setError('Error checking user status. Please try again.');
+      return false;
+    }
   };
 
-  const nextStep = () => {
-    if (currentStep < questions.length - 1) {
+  const handleInputChange = async (e) => {
+    const { name, value } = e.target;
+    
+    if (name === 'email') {
+      setAnswers(prev => ({
+        ...prev,
+        email: value
+      }));
+
+      // Only validate email field when it's complete
+      const isValid = questions[0].validation(value);
+      const newCompleted = [...isCompleted];
+      newCompleted[0] = isValid;
+      setIsCompleted(newCompleted);
+    } else {
+      setAnswers(prev => ({
+        ...prev,
+        preAssessment: {
+          ...prev.preAssessment,
+          responses: {
+            ...prev.preAssessment.responses,
+            [name]: value
+          }
+        },
+        profile: {
+          ...prev.profile,
+          [name]: value
+        }
+      }));
+      
+      const newCompleted = [...isCompleted];
+      newCompleted[currentStep] = questions[currentStep].validation(value);
+      setIsCompleted(newCompleted);
+    }
+  };
+
+  const nextStep = async () => {
+    if (currentStep === 0) {
+      const userExists = await checkExistingUser(answers.email);
+      if (!userExists) {
+        setCurrentStep(prev => prev + 1);
+      }
+    } else if (currentStep < questions.length - 1) {
       setCurrentStep(prev => prev + 1);
     }
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setIsLoading(true);
     setError('');
 
+    const now = new Date();
+
+    // Format data according to MongoDB schema
+    const submissionData = {
+      email: answers.email,
+      preAssessment: {
+        completedAt: now,
+        responses: {
+          experience: answers.preAssessment.responses.experience,
+          goals: answers.preAssessment.responses.goals,
+          learningStyle: answers.preAssessment.responses.learningStyle
+        }
+      },
+      profile: {
+        experience: answers.preAssessment.responses.experience,
+        goals: answers.preAssessment.responses.goals,
+        learningStyle: answers.preAssessment.responses.learningStyle,
+        lastActive: now
+      }
+    };
+
     try {
-      const res = await fetch('/api/generatePlan', {
+      // Generate the learning plan
+      const planRes = await fetch('/api/generatePlan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(answers),
+        body: JSON.stringify(submissionData),
       });
 
-      if (!res.ok) {
-        throw new Error(await res.text());
+      if (!planRes.ok) {
+        const errorText = await planRes.text();
+        throw new Error(errorText);
       }
 
-      const data = await res.json();
+      const plan = await planRes.json();
 
-      if (!data.learningPathway) {
+      if (!plan.learningPathway) {
         throw new Error('No plan data received');
       }
 
       setShowCelebration(true);
 
-      localStorage.setItem('learningPlan', JSON.stringify(data));
+      // Store user and plan data
+      localStorage.setItem('userId', plan.userId);
+      localStorage.setItem('learningPlan', JSON.stringify(plan));
 
       setTimeout(() => {
         router.push('/plan');
       }, 2000);
 
     } catch (error) {
+      console.error('Error:', error);
       setError(error.message || 'Something went wrong generating your plan.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleContinueExisting = () => {
+    setShowCelebration(true);
+    localStorage.setItem('planId', existingPlanId);
+    setTimeout(() => {
+      router.push('/plan');
+    }, 2000);
+  };
+
+  const handleCreateNew = () => {
+    setShowExistingUserDialog(false);
+    setCurrentStep(1);
   };
 
   const CurrentQuestion = questions[currentStep];
@@ -173,9 +316,10 @@ export default function PreAssessment() {
               <div className="space-y-4">
                 <Input
                   name={CurrentQuestion.field}
-                  value={answers[CurrentQuestion.field]}
+                  value={CurrentQuestion.field === 'email' ? answers.email : answers.preAssessment.responses[CurrentQuestion.field]}
                   onChange={handleInputChange}
                   placeholder={CurrentQuestion.placeholder}
+                  type={CurrentQuestion.field === 'email' ? 'email' : 'text'}
                   className="w-full text-lg p-4"
                   autoFocus
                 />
@@ -239,6 +383,25 @@ export default function PreAssessment() {
         </div>
       </motion.div>
 
+      <AlertDialog open={showExistingUserDialog} onOpenChange={setShowExistingUserDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Welcome Back!</AlertDialogTitle>
+            <AlertDialogDescription>
+              It looks like you already have a learning pathway. Would you like to continue with your existing pathway or create a new one?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCreateNew}>
+              Create New
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleContinueExisting}>
+              Continue Existing
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AnimatePresence>
         {showCelebration && (
           <motion.div
@@ -266,6 +429,12 @@ export default function PreAssessment() {
         @keyframes gradient-y {
           0%, 100% { transform: translateY(-25%); }
           50% { transform: translateY(25%); }
+        }
+
+        .animate-gradient-x {
+          animation: gradient-x {
+          0%, 100% { transform: translateX(-25%); }
+          50% { transform: translateX(25%); }
         }
 
         .animate-gradient-x {

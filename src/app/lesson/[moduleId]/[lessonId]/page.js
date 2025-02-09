@@ -258,8 +258,8 @@ export default function LessonPage() {
                   </div>
                 </motion.div>
 
-                {/* HARD-CODED FINAL STEP: Show camera module on last step */}
-                {currentStep === totalSteps - 1 && (
+                {/* If GPT indicates this step has a camera activity, show it here */}
+                {stepData.cameraActivity === true && (
                   <div className="mt-4">
                     <CameraModule />
                   </div>

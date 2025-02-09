@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-progress": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.2",
     "@tailwindcss/postcss": "^4.0.4",
@@ -16,6 +17,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.4.1",
     "lucide-react": "^0.475.0",
+    "mongodb": "^6.13.0",
     "next": "^15.1.6",
     "openai": "^4.83.0",
     "react": "^19.0.0",
@@ -25,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@types/mongodb": "^4.0.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
