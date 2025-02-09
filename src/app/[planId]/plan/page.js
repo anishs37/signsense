@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Book, ChevronRight, Home, Menu } from "lucide-react";
+import { Book, ChevronRight, Home, Menu, Trophy } from "lucide-react";
 
 export default function Plan({ params }) {
   const router = useRouter();
@@ -46,8 +46,6 @@ export default function Plan({ params }) {
   
         if (!generateResponse.ok) {
           console.error('Failed to generate trophy:', await generateResponse.text());
-        } else {
-          console.log('Trophy generation initiated');
         }
       } else if (!trophyResponse.ok && trophyResponse.status !== 404) {
         console.error('Error checking trophy:', await trophyResponse.text());
@@ -113,7 +111,6 @@ export default function Plan({ params }) {
         
         if (currentPlan.pathway) {
           processPathway(currentPlan.pathway);
-          // Fire the trophy generation in the background without waiting for it
           checkAndGenerateTrophy(email);
         } else {
           router.push("/pre-assessment");
@@ -139,8 +136,7 @@ export default function Plan({ params }) {
 
     const completedLessons = pathway.reduce((acc, module) => {
       const completedCount = (module.subLessons || []).filter(
-        (lesson) =>
-          localStorage.getItem(`lesson-${lesson.lessonId}-completed`) === "true"
+        (lesson) => lesson.status === "completed"
       ).length;
       return acc + completedCount;
     }, 0);
@@ -190,11 +186,19 @@ export default function Plan({ params }) {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="max-w-4xl mx-auto p-6">
         <header className="flex items-center justify-between mb-8">
-          <div>
-            <div className="flex items-center gap-4 mb-2">
-              <h1 className="text-3xl font-bold text-blue-600">
-                Your Learning Journey
-              </h1>
+          <div className="flex items-center gap-4 mb-2">
+            <h1 className="text-3xl font-bold text-blue-600">
+              Your Learning Journey
+            </h1>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => router.push(`/${planId}/trophy-case`)}
+                className="hover:bg-blue-50"
+              >
+                <Trophy className="h-4 w-4 text-blue-600" />
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon">
@@ -248,7 +252,7 @@ export default function Plan({ params }) {
                     <div className="flex items-center gap-3 mb-3">
                       <Book className="w-6 h-6 text-blue-500" />
                       <h2 className="text-xl font-semibold text-gray-800">
-                        {module.moduleTitle || `Module ${index + 1}`}
+                        {module.name || `Module ${index + 1}`}
                       </h2>
                     </div>
 
@@ -259,10 +263,7 @@ export default function Plan({ params }) {
                     <div className="space-y-3">
                       {module.subLessons && module.subLessons.length > 0 ? (
                         module.subLessons.map((lesson, i) => {
-                          const isCompleted =
-                            localStorage.getItem(
-                              `lesson-${lesson.lessonId}-completed`
-                            ) === "true";
+                          const isCompleted = lesson.status === "completed";
 
                           return (
                             <div
@@ -287,7 +288,7 @@ export default function Plan({ params }) {
 
                               <div className="flex-1">
                                 <h3 className="font-medium text-gray-800">
-                                  {lesson.title || `Lesson ${i + 1}`}
+                                  {lesson.lessonTitle || `Lesson ${i + 1}`}
                                 </h3>
                                 <p className="text-sm text-gray-600">
                                   {lesson.description || "No description."}
@@ -300,7 +301,7 @@ export default function Plan({ params }) {
                         })
                       ) : (
                         <p className="text-sm text-gray-600 italic">
-                          No sub-lessons found.
+                          No lessons found.
                         </p>
                       )}
                     </div>
