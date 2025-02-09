@@ -121,7 +121,7 @@ The computer vision system adapts to the user's skill level:
 - **Advanced Recognition:** As users progress, the system evaluates more nuanced aspects of signing, slowly building up to integrating all 20 landmarks of the MediaPipe model.
 
 
-![alt text](tbd.jpg)
+![alt text](mediapipe.gif)
 
 ## Hardware Pipeline
 
@@ -159,7 +159,7 @@ The Arduino-powered smart glove provides immediate, tactile feedback based on th
 This precise, finger-specific feedback system allows users to immediately understand which aspects of their sign need adjustment, creating a highly interactive and effective learning environment for ASL.
 
 
-![alt text](tbd-1.png)
+![alt text](glove.jpg)
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
