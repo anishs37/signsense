@@ -45,11 +45,12 @@
     <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
 </details>
+<br><br>
 
 
 
 <!-- ABOUT THE PROJECT -->
-## About The Project
+# About The Project
 
 ![alt text](images/dashboard.png)
 
@@ -76,7 +77,7 @@ SignSense introduces an innovative IoT-powered ASL learning system that combines
 This comprehensive system creates an immersive, adaptive, and rewarding ASL learning experience, making sign language acquisition more accessible and enjoyable for users of all levels.
 
 
-### Built With
+## Built With
 
 [![OpenCV][OpenCV]][OpenCV-url]
 [![Mediapipe][Mediapipe]][Mediapipe-url]
@@ -92,6 +93,75 @@ This comprehensive system creates an immersive, adaptive, and rewarding ASL lear
 [![Three.js][Three.js]][Three.js-url]
 [![MQTT][MQTT]][MQTT-url]
 
+<br>
+
+# Technologies
+
+## Computer Vision and Gesture Recognition
+
+Our solution leverages OpenCV and MediaPipe for real-time hand gesture recognition and sign language interpretation, ensuring high accuracy and efficiency in ASL learning.
+
+### Hand Tracking and Gesture Recognition
+
+Using MediaPipe's hand tracking module, we accurately identify and interpret user hand gestures, precisely tracking finger positions and movements. This allows for:
+
+- **Accurate Sign Detection:** The system can recognize and evaluate complex ASL signs, even in varying lighting conditions or backgrounds.
+- **Real-time Feedback:** Users receive instant feedback on their sign accuracy, allowing for immediate corrections and improvements.
+
+### Custom ASL Model Integration
+
+We've integrated custom-trained machine learning models specifically for ASL recognition, on two different levels:
+
+- **MediaPipe for static phrases:** For static words/phrases like the alphabet and numbers, MediaPipe and their hand landmarks detection model is sufficient to classify the image as a certain number/letter.
+- **LSTM for Complex Phrases:** For more complicated ASL phrases, we employ a Long Short-Term Memory (LSTM) neural network. This advanced model excels at capturing the temporal dependencies in sign language, allowing for accurate interpretation of complete sentences and complex expressions.
+
+### Adaptive Difficulty Scaling
+
+The computer vision system adapts to the user's skill level:
+
+- **Beginner-Friendly:** For new learners, the system focuses on specific landmarks that are correlated with getting the basic structure of the sign correct.
+- **Advanced Recognition:** As users progress, the system evaluates more nuanced aspects of signing, slowly building up to integrating all 20 landmarks of the MediaPipe model.
+
+
+![alt text](tbd.jpg)
+
+## Hardware Pipeline
+
+Our hardware pipeline creates a seamless interaction between the user's hand gestures and tactile feedback, utilizing computer vision, wireless communication, and a smart glove for an immersive ASL learning experience.
+
+### Gesture Recognition and Keypoint Mapping
+
+1. **Computer Vision Analysis:** When the user wears the glove and performs an ASL sign, our computer vision system, powered by OpenCV and MediaPipe, captures and analyzes the hand gesture.
+2. **Keypoint Extraction:** The system identifies and maps 21 key points on the hand, corresponding to joints and fingertips.
+3. **Gesture Classification:** These keypoints are then compared to our database of correct ASL signs to determine accuracy.
+
+### MQTT Communication
+
+We use MQTT (Message Queuing Telemetry Transport) for efficient, real-time communication between our gesture recognition system and the smart glove:
+
+- The gesture recognition results are published to a specific MQTT topic.
+- Our wireless Arduino board, integrated into the glove, is subscribed to this topic and receives the data instantly.
+
+### Smart Glove Feedback
+
+The Arduino-powered smart glove provides immediate, tactile feedback based on the gesture analysis:
+
+- **LED Feedback:** Each finger of the glove is equipped with LEDs. If a finger is in the incorrect position for the intended sign, its corresponding LED lights up red.
+- **Custom Animations:** This LED feedback will also be in the form of a custom animation on our web application.
+
+### Feedback Loop
+
+1. User performs an ASL sign wearing the smart glove.
+2. Computer vision system captures and analyzes the hand gesture.
+3. Keypoints are extracted and compared to the correct sign.
+4. Results are sent via MQTT to the Arduino in the glove.
+5. The Arduino activates specific LEDs based on the received data.
+6. User receives instant visual and tactile feedback, with incorrect finger positions highlighted in red on the glove.
+
+This precise, finger-specific feedback system allows users to immediately understand which aspects of their sign need adjustment, creating a highly interactive and effective learning environment for ASL.
+
+
+![alt text](tbd-1.png)
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
