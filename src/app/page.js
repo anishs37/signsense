@@ -9,7 +9,6 @@ import { HandMetal, Sparkles, Trophy, Brain, ChevronRight } from 'lucide-react';
 export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background relative overflow-hidden p-4">
-      {/* Animated gradient background */}
       <div className="absolute inset-0 bg-background">
         <div className="absolute inset-0 animate-gradient-x">
           <div className="absolute top-0 -left-1/2 w-[200%] h-[200%] bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5" />
@@ -18,8 +17,6 @@ export default function Home() {
           <div className="absolute top-0 -left-1/2 w-[200%] h-[200%] bg-gradient-to-b from-secondary/5 via-transparent to-secondary/5" />
         </div>
       </div>
-
-      {/* Floating orbs */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/10 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-orb-1" />
         <div className="absolute top-1/3 right-1/4 w-64 h-64 bg-accent/10 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-orb-2" />
@@ -27,7 +24,6 @@ export default function Home() {
       </div>
 
       <div className="relative z-10 max-w-4xl w-full">
-        {/* Main content container */}
         <div className="text-center mb-12 animate-fade-in">
           <div className="flex items-center justify-center mb-6">
             <HandMetal className="w-12 h-12 text-primary mr-4 animate-wave" />
@@ -39,8 +35,6 @@ export default function Home() {
             Master American Sign Language through interactive lessons and personalized learning paths
           </p>
         </div>
-
-        {/* Features grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <Card className="p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-card/80 backdrop-blur-sm">
             <Sparkles className="w-8 h-8 text-primary mb-4" />
@@ -58,8 +52,6 @@ export default function Home() {
             <p className="text-muted-foreground">Get detailed insights about your skills</p>
           </Card>
         </div>
-
-        {/* CTA Button */}
         <div className="text-center animate-bounce-slow">
           <Link href="/pre-assessment">
             <Button size="lg" className="px-8 py-6 text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group">
@@ -69,8 +61,6 @@ export default function Home() {
           </Link>
         </div>
       </div>
-
-      {/* Add custom styles for animations */}
       <style jsx global>{`
         @keyframes gradient-x {
           0%, 100% { transform: translateX(-25%); }

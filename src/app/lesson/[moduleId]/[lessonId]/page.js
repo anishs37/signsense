@@ -23,11 +23,12 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-import CameraModule from "@/components/cameraModule";
+import CameraLesson from "@/components/cameraLesson";
 
 function fixAdjoinedWords(str) {
   return str.replace(/([a-z])([A-Z])/g, "$1\n$2");
 }
+
 function forceHeadingsOnNewLine(str) {
   return str.replace(/(?!^)(#+\s)/g, "\n$1");
 }
@@ -213,7 +214,6 @@ export default function LessonPage() {
   const [moduleContext, setModuleContext] = useState(null);
   const [planId, setPlanId] = useState(null);
 
-  // Grab the planId from localStorage on mount.
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedPlanId = localStorage.getItem("planId");
@@ -364,7 +364,7 @@ export default function LessonPage() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-6 relative z-10">
+      <div className="max-w-6xl mx-auto p-6 relative z-10">
         <motion.header className="mb-8" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center justify-between mb-4">
             <Link href={planId ? `/${planId}/plan` : "/plan"}>
@@ -437,7 +437,7 @@ export default function LessonPage() {
                   </div>
 
                   <div className="p-4 bg-green-50 rounded-lg hover:shadow-md transition-shadow">
-                    <h4 className="font-medium text-green-800 mb=2 flex items-center gap=2">
+                    <h4 className="font-medium text-green-800 mb-2 flex items-center gap-2">
                       <CheckCircle className="w-4 h-4" />
                       Pro Tips
                     </h4>
@@ -458,9 +458,17 @@ export default function LessonPage() {
                 </motion.div>
 
                 {stepData.cameraActivity === true && (
-                  <div className="mt-4">
-                    <CameraModule />
-                  </div>
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="mt-8"
+                  >
+                    <div className="text-lg font-semibold text-gray-700 mb-4">
+                      Practice Activity
+                    </div>
+                    <CameraLesson />
+                  </motion.div>
                 )}
               </CardContent>
 

@@ -3,8 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import dynamic from 'next/dynamic';
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Timer, HandMetal, SkipForward, Award } from "lucide-react";
 
-// Import MediaPipe components
 const Camera = dynamic(
   () => import('@mediapipe/camera_utils/camera_utils').then((mod) => mod.Camera),
   { ssr: false }
@@ -34,33 +37,33 @@ export default function CameraLesson() {
   const handsRef = useRef(null);
   const cameraInstanceRef = useRef(null);
   const containerRef = useRef(null);
+  const sceneContainerRef = useRef(null);
 
   // Initialize dimensions on client side
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
+      const width = sceneContainerRef.current?.clientWidth || window.innerWidth;
+      const height = 600; // Fixed height for consistency
+      setDimensions({ width, height });
     }
   }, []);
 
   // Initialize Three.js scene
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !sceneContainerRef.current) return;
     jointsRef.current = []; 
 
     sceneRef.current = new THREE.Scene();
     cameraRef.current = new THREE.PerspectiveCamera(75, dimensions.width / dimensions.height, 0.1, 1000);
+    cameraRef.current.position.set(0, 0, 3);
+    cameraRef.current.lookAt(0, 0, 0);
+
     rendererRef.current = new THREE.WebGLRenderer({ alpha: true });
     rendererRef.current.setSize(dimensions.width, dimensions.height);
     
-    if (containerRef.current) {
-      containerRef.current.appendChild(rendererRef.current.domElement);
+    if (sceneContainerRef.current) {
+      sceneContainerRef.current.appendChild(rendererRef.current.domElement);
     }
-
-    cameraRef.current.position.set(0, 0, 2);
-    cameraRef.current.lookAt(0, 0, 0);
 
     const obj = new THREE.Object3D();
     const sphereGeometry = new THREE.SphereGeometry(0.015, 32, 16);
@@ -94,8 +97,9 @@ export default function CameraLesson() {
 
     // Handle window resize
     const handleResize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
+      if (!sceneContainerRef.current) return;
+      const width = sceneContainerRef.current.clientWidth;
+      const height = 600; // Keep fixed height
       setDimensions({ width, height });
       if (cameraRef.current && rendererRef.current) {
         cameraRef.current.aspect = width / height;
@@ -107,8 +111,8 @@ export default function CameraLesson() {
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      if (containerRef.current && rendererRef.current?.domElement) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
+      if (sceneContainerRef.current && rendererRef.current?.domElement) {
+        sceneContainerRef.current.removeChild(rendererRef.current.domElement);
       }
     };
   }, [dimensions.width, dimensions.height]);
@@ -134,27 +138,20 @@ export default function CameraLesson() {
         });
 
         handsRef.current.onResults((results) => {
-            if (!isTweening && results.multiHandLandmarks?.[0]) {
-              const landmarks = results.multiHandLandmarks[0];
-              
-              // Add debug logging
-              
-              console.log(jointsRef.current.length)
-              jointsRef.current.forEach((joint, i) => {
-                if (landmarks[i]) {
-                  // Store the calculated position for debugging
-                  const newX = -(landmarks[i].x - landmarks[0].x);
-                  const newY = -(landmarks[i].y - landmarks[0].y);
-                  const newZ = 0.6 + (landmarks[i].z - landmarks[0].z);
-                  
-                  // Set the position
-                  joint.position.set(newX, newY, newZ);
-                  joint.visible = true;
-                }
-              });
-              updateBones();
-            }
-          });
+          if (!isTweening && results.multiHandLandmarks?.[0]) {
+            const landmarks = results.multiHandLandmarks[0];
+            jointsRef.current.forEach((joint, i) => {
+              if (landmarks[i]) {
+                const newX = -(landmarks[i].x - landmarks[0].x);
+                const newY = -(landmarks[i].y - landmarks[0].y);
+                const newZ = 0.6 + (landmarks[i].z - landmarks[0].z);
+                joint.position.set(newX, newY, newZ);
+                joint.visible = true;
+              }
+            });
+            updateBones();
+          }
+        });
 
         const CameraModule = await import('@mediapipe/camera_utils/camera_utils');
         cameraInstanceRef.current = new CameraModule.Camera(videoRef.current, {
@@ -224,27 +221,27 @@ export default function CameraLesson() {
 
   const tweenUpdate = async (oldPositions, newPositions) => {
     setIsTweening(true);
-    console.log("Tween animation started...");
-
     for (let t = 0; t <= 1; t += 0.05) {
       jointsRef.current.forEach((joint, i) => {
         joint.position.lerpVectors(oldPositions[i], newPositions[i], t);
       });
-
       updateBones();
       await new Promise(resolve => setTimeout(resolve, 30));
     }
-
-    console.log("Tween animation complete.");
   };
 
+  // -------------------
+  // CHANGED: Always return an object that has a `different` array
+  // -------------------
   const compareHands = (hand1, hand2, threshold) => {
-    console.log(hand1.keypoints3D);
-    console.log(hand1.keypoints3D.length);
-    console.log(hand2.keypoints3D.length);
-    if (!hand1 || !hand2 || !hand1.keypoints3D || !hand2.keypoints3D) {
+    if (
+      !hand1 || 
+      !hand2 || 
+      !hand1.keypoints3D || 
+      !hand2.keypoints3D
+    ) {
       console.error("Invalid hand data.");
-      return { similar: false };
+      return { similar: false, different: [] };
     }
 
     let totalDifference = 0;
@@ -255,7 +252,7 @@ export default function CameraLesson() {
 
     if (numKeypoints !== hand2.keypoints3D.length) {
       console.error("Mismatch in keypoint count.");
-      return { similar: false };
+      return { similar: false, different: [] };
     }
 
     const wrist1 = hand1.keypoints3D[0];
@@ -276,8 +273,7 @@ export default function CameraLesson() {
     );
 
     if (scale1 === 0 || scale2 === 0) {
-      console.error("Scaling error: Reference joint distance is zero.");
-      return { similar: false };
+      return { similar: false, different: [] };
     }
 
     for (let i = 0; i < numKeypoints; i++) {
@@ -299,6 +295,7 @@ export default function CameraLesson() {
       let distance = Math.sqrt(
         Math.pow(normalizedKp1.x - normalizedKp2.x, 2) +
         Math.pow(normalizedKp1.y - normalizedKp2.y, 2)
+        // ignoring z for 2D angle check, as in the original code
       );
 
       totalDifference += distance;
@@ -319,8 +316,7 @@ export default function CameraLesson() {
     return { similar, maxDifferenceJoint, maxDifference, different };
   };
 
-// Update the stopTrackingAndTween function
-const stopTrackingAndTween = async () => {
+  const stopTrackingAndTween = async () => {
     setIsTweening(true);
   
     const letterBeingChecked = currentLetter;
@@ -342,15 +338,14 @@ const stopTrackingAndTween = async () => {
       if (similar) {
         alert(`Yay! You got ${letterBeingChecked} correct 🎉`);
         setScore(prev => prev + 1);
-        
-        // Wait before showing next letter
         await new Promise(resolve => setTimeout(resolve, 1000));
         setIsTweening(false);
         setRandomLetter();
         startTimer();
         return;
       }
-  
+
+      // If not similar, highlight the "different" joints in red
       const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
       different.forEach(index => {
         jointsRef.current[index].material = redMaterial;
@@ -358,11 +353,15 @@ const stopTrackingAndTween = async () => {
   
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      // Reset materials
       different.forEach(index => {
         jointsRef.current[index].material = new THREE.MeshNormalMaterial();
       });
       
+      // Make sure we only keep the first 21 spheres if something reinitialized
       jointsRef.current = jointsRef.current.slice(0, 21);
+
+      // Perform the tween to show the correct shape
       performTweenAnimation(storedData[0], letterBeingChecked);
     } catch (error) {
       console.error("Error loading JSON:", error);
@@ -379,8 +378,6 @@ const stopTrackingAndTween = async () => {
     ));
   
     await tweenUpdate(oldPositions, newPositions);
-    
-    // Only change the letter after tween is complete
     setIsTweening(false);
     setRandomLetter();
     startTimer();
@@ -414,37 +411,77 @@ const stopTrackingAndTween = async () => {
   };
 
   return (
-    <div 
-      ref={containerRef} 
-      className="relative w-full h-screen bg-black text-white"
-    >
-      <video 
-        ref={videoRef} 
-        className="fixed top-4 right-4 w-48 h-36 border border-white" 
-        hidden={!isLoaded}
-      />
-      <div className="fixed top-4 left-4 z-50 space-y-4">
-        <div className="text-2xl">Letter: {currentLetter}</div>
-        <button 
-          className="px-4 py-2 bg-blue-500 rounded hover:bg-blue-600"
-          onClick={() => {
-            clearInterval(timerIntervalRef.current);
-            stopTrackingAndTween().then(() => {
-              setRandomLetter();
-              startTimer();
-            });
-          }}
-        >
-          Skip
-        </button>
-        <div className="text-xl">Score: {score}</div>
-        <div className="text-xl">Time Left: {timeLeft}s</div>
-      </div>
-      {!isLoaded && (
-        <div className="fixed inset-0 flex items-center justify-center">
-          <div className="text-2xl">Loading...</div>
+    <Card className="w-full bg-gradient-to-b from-gray-900 to-gray-800 text-white overflow-hidden">
+      <CardContent className="p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" ref={containerRef}>
+          {/* Left Panel - Stats */}
+          <div className="space-y-4">
+            <div className="bg-gray-800/50 rounded-lg p-4 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <HandMetal className="w-6 h-6 text-blue-400" />
+                  <h3 className="text-xl font-bold">Current Letter</h3>
+                </div>
+                <span className="text-3xl font-bold text-blue-400">{currentLetter}</span>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center gap-2">
+                      <Timer className="w-4 h-4 text-blue-400" />
+                      <span className="text-sm text-gray-300">Time Left</span>
+                    </div>
+                    <span className="text-sm font-medium">{timeLeft}s</span>
+                  </div>
+                  <Progress value={(timeLeft / 10) * 100} className="h-2" />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-4 h-4 text-yellow-400" />
+                    <span className="text-sm text-gray-300">Score</span>
+                  </div>
+                  <span className="text-lg font-bold text-yellow-400">{score}</span>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => {
+                clearInterval(timerIntervalRef.current);
+                stopTrackingAndTween().then(() => {
+                  setRandomLetter();
+                  startTimer();
+                });
+              }}
+            >
+              <SkipForward className="w-4 h-4 mr-2" />
+              Skip Letter
+            </Button>
+          </div>
+
+          {/* Center Panel - THREE.js Scene */}
+          <div className="lg:col-span-2">
+            <div 
+              ref={sceneContainerRef}
+              className="relative w-full h-[600px] bg-gray-900/50 rounded-lg overflow-hidden backdrop-blur-sm"
+            >
+              <video 
+                ref={videoRef}
+                className="absolute top-4 right-4 w-48 h-36 rounded-lg border border-gray-600 bg-black"
+                hidden={!isLoaded}
+              />
+              {!isLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-xl text-white/80">Loading camera...</div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
