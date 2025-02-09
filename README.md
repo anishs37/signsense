@@ -83,7 +83,6 @@ This comprehensive system creates an immersive, adaptive, and rewarding ASL lear
 [![Mediapipe][Mediapipe]][Mediapipe-url]
 [![Python][Python]][Python-url]
 [![Nextjs][Nextjs]][Nextjs-url]
-[![Databricks][Databricks]][Databricks-url]
 [![MongoDB][MongoDB]][MongoDB-url]
 [![GoDaddy][GoDaddy]][GoDaddy-url]
 [![Arduino][Arduino]][Arduino-url]
@@ -173,8 +172,6 @@ This precise, finger-specific feedback system allows users to immediately unders
 [Python-url]: https://www.python.org/
 [Nextjs]: https://img.shields.io/badge/Nextjs-000000?style=for-the-badge&logo=Next.js&logoColor=white
 [Nextjs-url]: https://nextjs.org/
-[Databricks]: https://img.shields.io/badge/databricks-FF3621?style=for-the-badge&logo=Databricks&logoColor=white
-[Databricks-url]: https://www.databricks.com/product/open-source
 [MongoDB]: https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=MongoDB&logoColor=white
 [MongoDB-url]: https://www.mongodb.com/
 [GoDaddy]: https://img.shields.io/badge/GoDaddy-1BDBDB?style=for-the-badge&logo=GoDaddy&logoColor=white
